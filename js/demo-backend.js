@@ -158,6 +158,16 @@ export const demoBackend = {
     if (db.judges.some((j) => j.active && j.pin === judgePin)) throw new Error("This PIN is already used by another judge");
     db.judges.push({ id: db.nextJudgeId++, name, pin: judgePin, active: true }); save(db); return delay();
   },
+  adminUpdateJudge(pin, id, name, newPin) {
+    needAdmin(pin); const db = load(), j = db.judges.find((x) => x.id === id);
+    if (name && name.trim()) j.name = name.trim();
+    if (newPin) {
+      if (String(newPin).length < 4) throw new Error("Judge PIN must have at least 4 characters");
+      if (db.judges.some((x) => x.id !== id && x.active && x.pin === newPin)) throw new Error("This PIN is already used by another judge");
+      j.pin = newPin;
+    }
+    save(db); return delay();
+  },
   adminSetJudgeActive(pin, id, active) { needAdmin(pin); const db = load(); db.judges.find((j) => j.id === id).active = active; save(db); return delay(); },
   adminListJudges(pin) {
     needAdmin(pin); const db = load();

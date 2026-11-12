@@ -44,6 +44,7 @@ export function supabaseBackend(url, key) {
     adminDeleteTeam: (pin, id) => rpc("admin_delete_team", { p_pin: pin, p_id: id }),
     adminSetRoundTeams: (pin, round, ids) => rpc("admin_set_round_teams", { p_pin: pin, p_round: round, p_team_ids: ids }),
     adminAddJudge: (pin, name, judgePin) => rpc("admin_add_judge", { p_pin: pin, p_name: name, p_judge_pin: judgePin }),
+    adminUpdateJudge: (pin, id, name, newPin) => rpc("admin_update_judge", { p_pin: pin, p_id: id, p_name: name || "", p_new_pin: newPin || "" }),
     adminSetJudgeActive: (pin, id, active) => rpc("admin_set_judge_active", { p_pin: pin, p_id: id, p_active: active }),
     adminListJudges: (pin) => rpc("admin_list_judges", { p_pin: pin }),
     adminScores: (pin, round) => rpc("admin_scores", { p_pin: pin, p_round: round }),

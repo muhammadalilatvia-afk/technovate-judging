@@ -38,7 +38,7 @@ Open <http://localhost:8080>. Demo PINs: organizer `0000`, judges `1111`, `2222`
 
 1. Create a free account at <https://supabase.com> and a **New project** (region: closest to Uzbekistan, e.g. Frankfurt).
 2. Open **SQL Editor → New query**, paste the whole of [`supabase/schema.sql`](supabase/schema.sql) and press **Run**.
-   Then do the same with [`supabase/002_presentations_dashboard.sql`](supabase/002_presentations_dashboard.sql) (presentation uploads + dashboard).
+   Then do the same with [`supabase/002_presentations_dashboard.sql`](supabase/002_presentations_dashboard.sql) (presentation uploads + dashboard) and [`supabase/003_edit_judges.sql`](supabase/003_edit_judges.sql).
 3. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into [`js/config.js`](js/config.js).
 4. Commit and push. Open `admin.html` — the first visit asks you to choose the organizer PIN.
 

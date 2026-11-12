@@ -221,7 +221,10 @@ function presentationsPane(pane, { pres }) {
 }
 
 // ------------------------------------------------------------------ teams --
-function teamsPane(pane, { teams }) {
+function teamsPane(pane, { teams, st, boards }) {
+  const round = rounds.find((r) => r.id === st.active_round);
+  const maxNum = Math.max(0, ...teams.map((t) => Number((t.code.match(/\d+/) || [0])[0])));
+  const nextCode = "T" + String(maxNum + 1).padStart(2, "0");
   pane.innerHTML = `<div class="grid cols-2">
     <section class="card stack">
       <h2>Import teams from CSV</h2>
@@ -235,19 +238,21 @@ function teamsPane(pane, { teams }) {
         <button class="btn" id="tpl">Download CSV template</button></div>
     </section>
     <section class="card stack">
-      <h2>Add a team</h2>
-      <div class="grid cols-2"><label class="field"><span>Code</span><input type="text" id="n_code" placeholder="T46"></label>
+      <h2>➕ Add a new team (late registration)</h2>
+      <div class="grid cols-2"><label class="field"><span>Team code</span><input type="text" id="n_code" value="${esc(nextCode)}"></label>
         <label class="field"><span>Department</span><input type="text" id="n_dept" placeholder="IT Business"></label></div>
       <label class="field"><span>Project name</span><input type="text" id="n_proj"></label>
-      <label class="field"><span>Members (separate with ;)</span><input type="text" id="n_mem"></label>
+      <label class="field"><span>Members (separate with ;)</span><input type="text" id="n_mem" placeholder="Name One; Name Two; Name Three"></label>
       <label class="row small"><input type="checkbox" id="n_r1" checked> Competes in Round 1 (IT Business 3rd year)</label>
+      <label class="row small"><input type="checkbox" id="n_lineup" checked> Also add to the ${esc(round.name)} line-up now (at the end)</label>
       <button class="btn primary" id="add">Add team</button>
+      <p class="muted small">To add a participant to an existing team, click <b>✎ Edit</b> on that team below.</p>
     </section></div>
     <section class="card" style="margin-top:18px"><h2>All teams</h2>
       <table><thead><tr><th>Code</th><th>Project</th><th>Members</th><th>Department</th><th>Round 1</th><th></th></tr></thead><tbody>
-      ${teams.map((t) => `<tr><td><b>${esc(t.code)}</b></td><td>${esc(t.project)}</td><td class="small">${esc(t.members)}</td><td class="small">${esc(t.department)}</td>
+      ${teams.map((t) => `<tr data-row="${t.id}"><td><b>${esc(t.code)}</b></td><td>${esc(t.project)}</td><td class="small">${esc(t.members)}</td><td class="small">${esc(t.department)}</td>
         <td><input type="checkbox" data-r1="${t.id}" ${t.round1 ? "checked" : ""}></td>
-        <td><button class="btn danger" data-del="${t.id}" title="Delete">✕</button></td></tr>`).join("")}
+        <td style="white-space:nowrap"><button class="btn" data-edit="${t.id}">✎ Edit</button> <button class="btn danger" data-del="${t.id}" title="Delete">✕</button></td></tr>`).join("")}
       </tbody></table></section>`;
   let rows = null;
   document.getElementById("file").onchange = async (e) => {
@@ -265,10 +270,35 @@ function teamsPane(pane, { teams }) {
   document.getElementById("tpl").onclick = () => download("teams-template.csv", toCsv([["code", "project", "members", "department", "round1"], ["T01", "Example project", "Name One; Name Two", "IT Business", "yes"]]));
   document.getElementById("add").onclick = async () => {
     const v = (id) => document.getElementById(id).value.trim();
-    if (!v("n_code") || !v("n_proj")) return toast("Code and project are required", "err");
-    await run(() => api.adminImportTeams(pin, [{ code: v("n_code"), project: v("n_proj"), members: v("n_mem"), department: v("n_dept"), round1: document.getElementById("n_r1").checked }], false), "Team added");
-    render();
+    const code = v("n_code").toUpperCase();
+    if (!code || !v("n_proj")) return toast("Team code and project name are required", "err");
+    if (teams.some((t) => t.code.toUpperCase() === code)) return toast(`Team code ${code} already exists`, "err");
+    await run(() => api.adminImportTeams(pin, [{ code, project: v("n_proj"), members: v("n_mem").split(/[;,]/).map((x) => x.trim()).filter(Boolean).join("; "),
+      department: v("n_dept"), round1: document.getElementById("n_r1").checked }], false));
+    if (document.getElementById("n_lineup").checked) {
+      const fresh = (await api.getTeams()).find((t) => t.code.toUpperCase() === code);
+      const ids = [...boards[round.id]].sort((a, b) => a.position - b.position).map((t) => t.team_id);
+      if (fresh && !ids.includes(fresh.id)) await run(() => api.adminSetRoundTeams(pin, round.id, [...ids, fresh.id]));
+    }
+    toast(`Team ${code} added`); render();
   };
+  pane.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => {
+    const t = teams.find((x) => x.id === Number(b.dataset.edit));
+    const row = pane.querySelector(`[data-row="${t.id}"]`);
+    row.innerHTML = `<td><input type="text" value="${esc(t.code)}" data-f="code" style="width:70px"></td>
+      <td><input type="text" value="${esc(t.project)}" data-f="project"></td>
+      <td><input type="text" value="${esc(t.members)}" data-f="members" title="Separate members with ;"></td>
+      <td><input type="text" value="${esc(t.department)}" data-f="department"></td><td></td>
+      <td style="white-space:nowrap"><button class="btn primary" data-save>Save</button> <button class="btn" data-cancel>Cancel</button></td>`;
+    row.querySelector("[data-f=members]").focus();
+    row.querySelector("[data-cancel]").onclick = () => render();
+    row.querySelector("[data-save]").onclick = async () => {
+      const patch = Object.fromEntries([...row.querySelectorAll("[data-f]")].map((i) => [i.dataset.f, i.value.trim()]));
+      patch.members = patch.members.split(/[;,]/).map((x) => x.trim()).filter(Boolean).join("; ");
+      if (!patch.code || !patch.project) return toast("Team code and project name are required", "err");
+      await run(() => api.adminUpdateTeam(pin, t.id, patch), `${patch.code} saved`); render();
+    };
+  });
   pane.querySelectorAll("[data-r1]").forEach((c) => c.onchange = () => run(() => api.adminUpdateTeam(pin, Number(c.dataset.r1), { round1: c.checked }), "Saved"));
   pane.querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => {
     if (!confirm("Delete this team and all its scores?")) return;
@@ -320,10 +350,13 @@ function judgesPane(pane, { judges }) {
       <table><thead><tr><th>Name</th><th class="num">Scores given</th><th>Status</th><th></th></tr></thead><tbody>
       ${judges.map((j) => `<tr><td><b>${esc(j.name)}</b></td><td class="num">${j.scores}</td>
         <td>${j.active ? `<span class="badge ok">ACTIVE</span>` : `<span class="badge off">REMOVED</span>`}</td>
-        <td><button class="btn ${j.active ? "danger" : ""}" data-j="${j.id}" data-a="${j.active ? 0 : 1}">${j.active ? "Remove" : "Restore"}</button></td></tr>`).join("")}
+        <td style="white-space:nowrap"><button class="btn" data-ren="${j.id}" data-name="${esc(j.name)}">✎ Rename</button>
+          <button class="btn" data-pin="${j.id}" data-name="${esc(j.name)}">🔑 New PIN</button>
+          <button class="btn ${j.active ? "danger" : ""}" data-j="${j.id}" data-a="${j.active ? 0 : 1}">${j.active ? "Remove" : "Restore"}</button></td></tr>`).join("")}
       </tbody></table>
       <p class="muted small">Removing a judge keeps their submitted scores but hides them from the live screen and stops further scoring.</p></section>
-    <section class="card stack"><h2>Add a judge</h2>
+    <section class="card stack"><h2>➕ Add an extra judge</h2>
+      <p class="muted small">New judges can join at any time, even in the middle of a round. Their scores count for the teams they score; a team's result is the average of the judges who scored it.</p>
       <label class="field"><span>Name shown on the live screen</span><input type="text" id="jn" placeholder="e.g. Dr. Karimov"></label>
       <label class="field"><span>Personal PIN (min. 4 digits, give it to the judge privately)</span><input type="text" id="jp" inputmode="numeric"></label>
       <button class="btn primary" id="jadd">Add judge</button>
@@ -332,6 +365,17 @@ function judgesPane(pane, { judges }) {
       <label class="field"><span>New organizer PIN</span><input type="password" id="np"></label><button class="btn" id="npb">Change PIN</button>` : ""}
     </section></div>`;
   pane.querySelectorAll("[data-j]").forEach((b) => b.onclick = async () => { await run(() => api.adminSetJudgeActive(pin, Number(b.dataset.j), b.dataset.a === "1"), "Saved"); render(); });
+  pane.querySelectorAll("[data-ren]").forEach((b) => b.onclick = async () => {
+    const name = prompt("New name shown on the live screen:", b.dataset.name);
+    if (!name || !name.trim()) return;
+    await run(() => api.adminUpdateJudge(pin, Number(b.dataset.ren), name.trim(), ""), "Judge renamed"); render();
+  });
+  pane.querySelectorAll("[data-pin]").forEach((b) => b.onclick = async () => {
+    const suggestion = String(Math.floor(100000 + Math.random() * 900000));
+    const p = prompt(`New PIN for ${b.dataset.name} (min. 4 digits). Write it down and give it to the judge:`, suggestion);
+    if (!p) return;
+    await run(() => api.adminUpdateJudge(pin, Number(b.dataset.pin), "", p.trim()), `New PIN saved for ${b.dataset.name}: ${p.trim()}`); render();
+  });
   document.getElementById("jgen").onclick = () => { document.getElementById("jp").value = String(Math.floor(100000 + Math.random() * 900000)); };
   document.getElementById("jadd").onclick = async () => {
     const n = document.getElementById("jn").value.trim(), p = document.getElementById("jp").value.trim();
