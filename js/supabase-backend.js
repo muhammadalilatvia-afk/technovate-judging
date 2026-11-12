@@ -27,6 +27,7 @@ export function supabaseBackend(url, key) {
     getTeams: async () => ok(await sb.from("teams").select("id,code,project,members,department,round1,photo_path").order("code")),
     getRoundTeams: async (round) => ok(await sb.from("round_teams").select("*").eq("round_id", round).order("position")),
     getLeaderboard: async (round) => ok(await sb.from("leaderboard").select("*").eq("round_id", round)),
+    getRoundStatus: () => rpc("round_status", {}),
     getJudgeProgress: async () => ok(await sb.from("judge_progress").select("*").order("judge_id")),
 
     judgeLogin: (pin) => rpc("judge_login", { p_pin: pin }),

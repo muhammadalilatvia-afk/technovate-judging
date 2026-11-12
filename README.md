@@ -39,7 +39,7 @@ Open <http://localhost:8080>. Demo PINs: organizer `0000`, judges `1111`, `2222`
 
 1. Create a free account at <https://supabase.com> and a **New project** (region: closest to Uzbekistan, e.g. Frankfurt).
 2. Open **SQL Editor → New query**, paste the whole of [`supabase/schema.sql`](supabase/schema.sql) and press **Run**.
-   Then do the same with [`supabase/002_presentations_dashboard.sql`](supabase/002_presentations_dashboard.sql) (presentation uploads + dashboard) , [`supabase/003_edit_judges.sql`](supabase/003_edit_judges.sql) and [`supabase/004_team_photos.sql`](supabase/004_team_photos.sql).
+   Then do the same with [`supabase/002_presentations_dashboard.sql`](supabase/002_presentations_dashboard.sql) (presentation uploads + dashboard) , [`supabase/003_edit_judges.sql`](supabase/003_edit_judges.sql) , [`supabase/004_team_photos.sql`](supabase/004_team_photos.sql) and [`supabase/005_auto_advance.sql`](supabase/005_auto_advance.sql).
 3. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into [`js/config.js`](js/config.js).
 4. Commit and push. Open `admin.html` — the first visit asks you to choose the organizer PIN.
 
@@ -66,8 +66,8 @@ The anon key is meant to be public. Reading is limited to teams, line-ups and ag
 | Team walks on stage | **Put on stage** (or *Next team ▶*) — every judge screen switches to that team |
 | Presentation ends | **Scoring: open** — judges submit; the live screen ticks each judge off |
 | All judges scored | Live screen reveals the team's score and rank. Click *Next team ▶* |
-| Round 1 finished | Rounds tab → Round 2 → *Build line-up* (top 20 of Round 1 + teams that skip Round 1) → Event control → **Round 2** |
-| Round 2 finished | Rounds tab → Final → *Build line-up* (top 5) → **Final** |
+| Round 1 finished | Automatic: when every team has every judge's score, the top 20 + teams that skip Round 1 move into Round 2. Click **▶ Start Round 2** in the green banner |
+| Round 2 finished | Automatic: the top 5 move into the Final. Click **▶ Start Final** |
 | Awards | Live screen view **Winners** shows the podium. Use *Scores visible: hidden* to keep results secret until the reveal |
 | After each round | Results tab → download **Ranking CSV**, **All judge scores CSV** and the **Full backup (JSON)** |
 

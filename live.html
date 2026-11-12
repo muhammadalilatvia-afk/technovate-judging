@@ -37,7 +37,8 @@ const setScreen = (html) => { if (html !== lastHtml) { lastHtml = html; screen.i
 async function render() {
   const st = await api.getState();
   const round = rounds.find((r) => r.id === st.active_round) || rounds[0];
-  const [board, judges] = await Promise.all([api.getLeaderboard(round.id), api.getJudgeProgress()]);
+  const [board, judges, rstatus] = await Promise.all([api.getLeaderboard(round.id), api.getJudgeProgress(), api.getRoundStatus().catch(() => [])]);
+  const done = (rstatus || []).find((r) => r.round_id === round.id)?.complete;
   const ranked = rank(board);
   const order = [...board].sort((a, b) => a.position - b.position);
   const cur = board.find((r) => r.team_id === st.current_team_id);
@@ -48,7 +49,9 @@ async function render() {
   document.getElementById("round").innerHTML = `${esc(round.name)} <span>· ${scoredCount}/${board.length} teams</span>`;
   document.getElementById("foot").innerHTML = st.message
     ? `<b>📢</b> ${esc(st.message)}`
-    : next ? `<b>NEXT UP</b> ${esc(next.code)} · ${esc(next.project)}` : `<b>${esc(round.name)}</b> ${esc(round.description)}`;
+    : done ? (round.id < 3 ? `<b>✅ ${esc(round.name)} COMPLETE</b> Top ${round.qualify_top} qualified for ${esc(rounds[round.id].name)} — congratulations!`
+                           : `<b>🏆 FINAL COMPLETE</b> Congratulations to all winners!`)
+    : next ?`<b>NEXT UP</b> ${esc(next.code)} · ${esc(next.project)}` : `<b>${esc(round.name)}</b> ${esc(round.description)}`;
 
   if (st.view === "welcome") {
     setScreen(`<div class="center-screen">
@@ -64,7 +67,7 @@ async function render() {
     const members = (cur.members || "").split(";").map((m) => m.trim()).filter(Boolean);
     const photo = cur.photo_path ? api.photoUrl(cur.photo_path) : "";
     setScreen(`<div class="intro reveal">
-      <div class="intro-photo">${photo ? `<img src="${esc(photo)}" alt="">` : `<div class="intro-ph">${esc(cur.code)}</div>`}</div>
+      <div class="intro-photo">${photo ? `<img src="${esc(photo)}" alt="" onerror="this.outerHTML='<div class=&quot;intro-ph&quot;>${esc(cur.code)}</div>'">` : `<div class="intro-ph">${esc(cur.code)}</div>`}</div>
       <div class="intro-text">
         <div class="label">${esc(round.name)} · TEAM ${pos} OF ${order.length}</div>
         <div class="intro-code">${esc(cur.code)}</div>

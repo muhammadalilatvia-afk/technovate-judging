@@ -71,6 +71,29 @@ const needAdmin = (pin) => { if (pin !== ADMIN_PIN) throw new Error("Wrong admin
 const judgeBy = (db, pin) => db.judges.find((j) => j.active && j.pin === pin);
 const delay = (v) => Promise.resolve(v);
 
+function roundComplete(db, r) {
+  const lineup = db.round_teams.filter((x) => x.round_id === r);
+  const judges = db.judges.filter((j) => j.active).map((j) => j.id);
+  return lineup.length > 0 && judges.length > 0 && lineup.every((rt) =>
+    judges.every((j) => db.scores.some((s) => s.round_id === r && s.team_id === rt.team_id && s.judge_id === j)));
+}
+function ranked(db, r) {
+  return db.round_teams.filter((x) => x.round_id === r).map((rt) => {
+    const sc = db.scores.filter((s) => s.round_id === r && s.team_id === rt.team_id);
+    const t = db.teams.find((x) => x.id === rt.team_id) || {};
+    const avg = (f) => sc.reduce((a, s) => a + f(s), 0) / (sc.length || 1);
+    return { id: rt.team_id, code: t.code, n: sc.length, score: avg((s) => s.total), inn: avg((s) => +s.criteria["1"]) };
+  }).filter((x) => x.n).sort((a, b) => b.score - a.score || b.inn - a.inn || String(a.code).localeCompare(String(b.code)));
+}
+function autoAdvance(db) {
+  for (const r of [1, 2]) {
+    if (!roundComplete(db, r) || db.scores.some((s) => s.round_id === r + 1)) continue;
+    let ids = ranked(db, r).slice(0, ROUNDS[r - 1].qualify_top).map((x) => x.id);
+    if (r === 1) ids = ids.concat(db.teams.filter((t) => !t.round1 && !ids.includes(t.id)).sort((a, b) => a.code.localeCompare(b.code)).map((t) => t.id));
+    db.round_teams = db.round_teams.filter((x) => x.round_id !== r + 1).concat(ids.map((id, i) => ({ round_id: r + 1, team_id: id, position: i + 1 })));
+  }
+}
+
 export const demoBackend = {
   mode: "demo",
   subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
@@ -88,6 +111,14 @@ export const demoBackend = {
       return { round_id: round, team_id: rt.team_id, code: t.code, project: t.project, members: t.members, department: t.department,
                position: rt.position, judges: s.length, score: +(avg((x) => x.total) * 100 / maxTotal).toFixed(2),
                innovation: +avg((x) => +x.criteria["1"]).toFixed(2), photo_path: t.photo_path || null };
+    }));
+  },
+  getRoundStatus() {
+    const db = load(), act = db.judges.filter((j) => j.active).map((j) => j.id);
+    return delay(ROUNDS.map((r) => {
+      const lineup = db.round_teams.filter((x) => x.round_id === r.id);
+      return { round_id: r.id, complete: roundComplete(db, r.id), teams: lineup.length,
+        scored_all: lineup.filter((rt) => act.every((j) => db.scores.some((s) => s.round_id === r.id && s.team_id === rt.team_id && s.judge_id === j))).length };
     }));
   },
   getJudgeProgress() {
@@ -121,6 +152,7 @@ export const demoBackend = {
     }
     db.scores = db.scores.filter((s) => !(s.round_id === round && s.team_id === team && s.judge_id === j.id));
     db.scores.push({ round_id: round, team_id: team, judge_id: j.id, criteria: clean, total, comment: comment || "", updated_at: new Date().toISOString() });
+    autoAdvance(db);
     save(db);
     return delay(total);
   },

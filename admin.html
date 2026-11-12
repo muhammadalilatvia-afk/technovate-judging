@@ -75,8 +75,8 @@ async function load() {
     Promise.all(rounds.map((r) => api.getLeaderboard(r.id))),
     api.adminListJudges(pin),
   ]);
-  const [progress, pres, activity] = await Promise.all([api.getJudgeProgress(), api.adminPresentations(pin), api.adminActivity(pin, 30)]);
-  return { st, teams, boards: Object.fromEntries(rounds.map((r, i) => [r.id, boards[i]])), judges, progress, pres, activity };
+  const [progress, pres, activity, rstatus] = await Promise.all([api.getJudgeProgress(), api.adminPresentations(pin), api.adminActivity(pin, 30), api.getRoundStatus()]);
+  return { st, teams, boards: Object.fromEntries(rounds.map((r, i) => [r.id, boards[i]])), judges, progress, pres, activity, rstatus };
 }
 
 // -------------------------------------------------------------- rendering --
@@ -90,14 +90,47 @@ async function render() {
   ({ dashboard, control, presentations: presentationsPane, teams: teamsPane, rounds: roundsPane, judges: judgesPane, results })[tab](pane, D);
 }
 
+// --------------------------------------------------------- round banner --
+function advanceBanner({ st, boards, rstatus }) {
+  const cur = (rstatus || []).find((r) => r.round_id === st.active_round);
+  if (!cur) return "";
+  const round = rounds.find((r) => r.id === st.active_round);
+  if (!cur.complete) {
+    return cur.teams ? `<div class="card" style="margin-bottom:16px;padding:12px 18px"><b>${esc(round.name)} progress:</b> ${cur.scored_all} of ${cur.teams} teams scored by all judges.
+      ${round.id < 3 ? `When all are scored, the top ${round.qualify_top} move to ${esc(rounds[round.id].name)} automatically.` : ""}</div>` : "";
+  }
+  if (round.id < 3) {
+    const next = rounds[round.id], n = boards[next.id].length;
+    return `<div class="card" style="margin-bottom:16px;border-color:var(--green);background:rgba(34,197,94,.12)">
+      <h2 style="margin:0 0 6px">✅ ${esc(round.name)} complete — ${n} teams are now in ${esc(next.name)}</h2>
+      <p class="muted small" style="margin:0 0 10px">The top ${round.qualify_top}${round.id === 1 ? " plus the teams that skip Round 1" : ""} were moved automatically. Announce the results, then start the next round.</p>
+      <button class="btn green big" data-start="${next.id}">▶ Start ${esc(next.name)}</button>
+      <button class="btn" data-view-now="podium">🏆 Show ${esc(round.name)} top 3 on screen</button></div>`;
+  }
+  return `<div class="card" style="margin-bottom:16px;border-color:#fbbf24;background:rgba(251,191,36,.12)">
+    <h2 style="margin:0 0 10px">🏆 Final complete — the winners are decided</h2>
+    <button class="btn primary big" data-view-now="podium">Show winners on the big screen</button></div>`;
+}
+function wireBanner(pane, st) {
+  pane.querySelectorAll("[data-start]").forEach((b) => b.onclick = async () => {
+    const id = Number(b.dataset.start);
+    await run(() => api.adminSetState(pin, { active_round: id, current_team_id: null, scoring_open: false, view: "welcome" }), `${rounds[id - 1].name} started`);
+    render();
+  });
+  pane.querySelectorAll("[data-view-now]").forEach((b) => b.onclick = async () => {
+    await run(() => api.adminSetState(pin, { view: b.dataset.viewNow }), "Live screen updated"); render();
+  });
+}
+
 // ---------------------------------------------------------- event control --
-function control(pane, { st, boards, progress, pres }) {
+function control(pane, D) {
+  const { st, boards, progress, pres } = D;
   const slides = Object.fromEntries(pres.filter((p) => p.file_path).map((p) => [p.team_id, p]));
   const round = rounds.find((r) => r.id === st.active_round);
   const lineup = [...boards[round.id]].sort((a, b) => a.position - b.position);
   const curIdx = lineup.findIndex((t) => t.team_id === st.current_team_id);
   const allDone = progress.length && progress.every((j) => j.scored_current);
-  pane.innerHTML = `<div class="grid" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)">
+  pane.innerHTML = advanceBanner(D) + `<div class="grid" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)">
     <section class="card">
       <h2>Team on stage</h2>
       <div class="row" style="margin-bottom:12px">
@@ -134,6 +167,7 @@ function control(pane, { st, boards, progress, pres }) {
       </div>
     </section></div>`;
 
+  wireBanner(pane, st);
   const set = (patch, msg) => run(() => api.adminSetState(pin, patch), msg).then(render);
   pane.querySelectorAll("[data-round]").forEach((b) => b.onclick = () => set({ active_round: Number(b.dataset.round), current_team_id: null, scoring_open: false }, "Round changed"));
   pane.querySelectorAll("[data-stage]").forEach((b) => b.onclick = () => set({ current_team_id: Number(b.dataset.stage), scoring_open: false, view: "intro" }));
@@ -147,7 +181,8 @@ function control(pane, { st, boards, progress, pres }) {
 }
 
 // -------------------------------------------------------------- dashboard --
-function dashboard(pane, { st, teams, boards, judges, progress, pres, activity }) {
+function dashboard(pane, D) {
+  const { st, teams, boards, judges, progress, pres, activity } = D;
   const round = rounds.find((r) => r.id === st.active_round);
   const activeJudges = judges.filter((j) => j.active).length;
   const students = teams.reduce((a, t) => a + (t.members ? t.members.split(";").filter((x) => x.trim()).length : 0), 0);
@@ -163,7 +198,7 @@ function dashboard(pane, { st, teams, boards, judges, progress, pres, activity }
       <td>${top ? `${esc(top.code)} · ${fmt(top.score)}` : "–"}</td></tr>`;
   }).join("");
   const missing = pres.filter((p) => !p.file_name);
-  pane.innerHTML = `
+  pane.innerHTML = advanceBanner(D) + `
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
       ${stat("Teams", teams.length, `${teams.filter((t) => t.round1).length} in Round 1 · ${teams.filter((t) => !t.round1).length} from Round 2`)}
       ${stat("Students", students, "registered participants")}
@@ -192,6 +227,7 @@ function dashboard(pane, { st, teams, boards, judges, progress, pres, activity }
     <section class="card" style="margin-top:18px"><h2>Missing presentations <span class="badge">${missing.length}</span></h2>
       <div class="pill-list">${missing.map((p) => `<button title="${esc(p.project)}">${esc(p.code)}</button>`).join("") || `<span class="muted">All teams have uploaded 🎉</span>`}</div>
     </section>`;
+  wireBanner(pane, st);
   document.getElementById("tglUploads").onclick = () => run(() => api.adminSetState(pin, { uploads_open: !st.uploads_open }), "Saved").then(render);
 }
 
@@ -327,7 +363,7 @@ function roundsPane(pane, { teams, boards }) {
     const lineup = [...boards[r.id]].sort((a, b) => a.position - b.position);
     const scored = lineup.filter((t) => t.judges).length;
     return `<section class="card stack"><h2>${esc(r.name)} <span class="badge">${lineup.length} teams</span></h2>
-      <p class="muted small">${esc(r.description)}</p>
+      <p class="muted small">${esc(r.description)}</p>${r.id > 1 ? `<p class="small" style="color:#86efac;margin:0">⚡ Filled automatically when ${esc(rounds[r.id - 2].name)} is fully scored.</p>` : ""}
       <button class="btn primary" data-build="${r.id}">Build line-up</button>
       <p class="muted small">${plans[r.id].label}${r.id > 1 && !(r.id === 2 ? r1 : r2).length ? " — previous round has no scores yet." : ""}</p>
       <button class="btn" data-shuffle="${r.id}" ${lineup.length < 2 ? "disabled" : ""}>🔀 Random presentation order</button>

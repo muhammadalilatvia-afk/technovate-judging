@@ -124,8 +124,9 @@ export function teamsFromCsv(text) {
 export function avatar(api, row, size = 48, cls = "") {
   const url = row?.photo_path ? api.photoUrl(row.photo_path) : "";
   const initials = String(row?.code || "?").replace(/^T/i, "") || "?";
+  const fallback = `<span class='avatar none ${cls}' style='width:${size}px;height:${size}px;font-size:${Math.round(size / 2.6)}px'>${esc(initials)}</span>`;
   return url
-    ? `<img class="avatar ${cls}" src="${esc(url)}" alt="" style="width:${size}px;height:${size}px" loading="lazy">`
+    ? `<img class="avatar ${cls}" src="${esc(url)}" alt="" style="width:${size}px;height:${size}px" loading="lazy" onerror="this.outerHTML=&quot;${fallback.replace(/"/g, "&quot;")}&quot;">`
     : `<span class="avatar none ${cls}" style="width:${size}px;height:${size}px;font-size:${Math.round(size / 2.6)}px">${esc(initials)}</span>`;
 }
 
