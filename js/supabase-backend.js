@@ -24,7 +24,7 @@ export function supabaseBackend(url, key) {
     getRounds: async () => ok(await sb.from("rounds").select("*").order("id")),
     getCriteria: async () => ok(await sb.from("criteria").select("*").order("position")),
     getState: async () => ok(await sb.from("state").select("*").eq("id", 1).single()),
-    getTeams: async () => ok(await sb.from("teams").select("id,code,project,members,department,round1").order("code")),
+    getTeams: async () => ok(await sb.from("teams").select("id,code,project,members,department,round1,photo_path").order("code")),
     getRoundTeams: async (round) => ok(await sb.from("round_teams").select("*").eq("round_id", round).order("position")),
     getLeaderboard: async (round) => ok(await sb.from("leaderboard").select("*").eq("round_id", round)),
     getJudgeProgress: async () => ok(await sb.from("judge_progress").select("*").order("judge_id")),
@@ -52,37 +52,55 @@ export function supabaseBackend(url, key) {
     adminPresentations: (pin) => rpc("admin_presentations", { p_pin: pin }),
     adminActivity: (pin, limit = 25) => rpc("admin_activity", { p_pin: pin, p_limit: limit }),
 
-    // presentations
+    adminClearPhoto: (pin, teamId) => rpc("admin_clear_photo", { p_pin: pin, p_team: teamId }),
+
+    // presentations + team photos
     teamCheck: (code, key) => rpc("team_check", { p_code: code, p_key: key }),
     fileUrl: (path) => sb.storage.from("presentations").getPublicUrl(path).data.publicUrl,
-    /** Upload straight to Supabase Storage with a progress callback, then register it for the team. */
+    photoUrl: (path) => (path ? sb.storage.from("team-photos").getPublicUrl(path).data.publicUrl : ""),
+    /** Upload a presentation straight to Supabase Storage with progress, then register it for the team. */
     async uploadPresentation(code, key, file, onProgress) {
-      const team = await rpc("team_check", { p_code: code, p_key: key });
-      if (!team) throw new Error("Wrong team code or upload code");
-      if (!team.uploads_open) throw new Error("Uploads are closed by the organizer");
-      code = team.code;
+      const team = await checkTeam(code, key);
       const safe = file.name.normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-90);
-      const path = `${code}/${crypto.randomUUID()}/${safe}`;
+      const path = `${team.code}/${crypto.randomUUID()}/${safe}`;
       const type = file.type || ({ pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", ppt: "application/vnd.ms-powerpoint", pdf: "application/pdf" })[file.name.split(".").pop().toLowerCase()];
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${url}/storage/v1/object/presentations/${path.split("/").map(encodeURIComponent).join("/")}`);
-        xhr.setRequestHeader("Authorization", `Bearer ${key_}`);
-        xhr.setRequestHeader("apikey", key_);
-        xhr.setRequestHeader("Content-Type", type);
-        xhr.setRequestHeader("x-upsert", "false");
-        xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total);
-        xhr.onerror = () => reject(new Error("Network error during upload. Please try again."));
-        xhr.onload = async () => {
-          if (xhr.status >= 300) {
-            let msg = xhr.responseText; try { msg = JSON.parse(xhr.responseText).message || msg; } catch {}
-            return reject(new Error(`Upload failed: ${msg}`));
-          }
-          try { await rpc("register_presentation", { p_code: code, p_key: key, p_path: path, p_name: file.name, p_size: file.size }); resolve(path); }
-          catch (e) { reject(e); }
-        };
-        xhr.send(file);
-      });
+      await putObject("presentations", path, file, type, onProgress);
+      await rpc("register_presentation", { p_code: team.code, p_key: key, p_path: path, p_name: file.name, p_size: file.size });
+      return path;
+    },
+    /** Upload a (already resized) team photo, then attach it to the team. */
+    async uploadPhoto(code, key, blob, onProgress) {
+      const team = await checkTeam(code, key);
+      const path = `${team.code}/${crypto.randomUUID()}.jpg`;
+      await putObject("team-photos", path, blob, "image/jpeg", onProgress);
+      await rpc("register_photo", { p_code: team.code, p_key: key, p_path: path });
+      return path;
     },
   };
+
+  async function checkTeam(code, key) {
+    const team = await rpc("team_check", { p_code: code, p_key: key });
+    if (!team) throw new Error("Wrong team code or upload code");
+    if (!team.uploads_open) throw new Error("Uploads are closed by the organizer");
+    return team;
+  }
+
+  function putObject(bucket, path, body, type, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${url}/storage/v1/object/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`);
+      xhr.setRequestHeader("Authorization", `Bearer ${key_}`);
+      xhr.setRequestHeader("apikey", key_);
+      xhr.setRequestHeader("Content-Type", type);
+      xhr.setRequestHeader("x-upsert", "false");
+      xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total);
+      xhr.onerror = () => reject(new Error("Network error during upload. Please try again."));
+      xhr.onload = () => {
+        if (xhr.status < 300) return resolve();
+        let msg = xhr.responseText; try { msg = JSON.parse(xhr.responseText).message || msg; } catch {}
+        reject(new Error(`Upload failed: ${msg}`));
+      };
+      xhr.send(body);
+    });
+  }
 }

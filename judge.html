@@ -20,7 +20,7 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, toast, modeBadge } from "./js/common.js";
+import { getApi, esc, fmt, toast, modeBadge, avatar } from "./js/common.js";
 import { QUESTIONS, FOLLOW_UPS } from "./js/questions.js";
 // Question helper state: which question is highlighted, and which were already asked per team (this browser only).
 let qPick = null, qTeam = null;
@@ -84,11 +84,14 @@ async function render() {
         <span class="badge ${st.scoring_open ? "ok" : "off"}">${st.scoring_open ? "SCORING OPEN" : "SCORING CLOSED"}</span>
         ${!following ? `<button class="btn" id="follow">↩ Back to team on stage</button>` : ""}</div>
       ${team ? `
-      <div class="teamhero">
+      <div class="teamhero" style="display:flex;gap:18px;align-items:center">
+        ${avatar(api, team, 110, "sq")}
+        <div style="min-width:0">
         <div class="code">${esc(team.code)} ${team.team_id === st.current_team_id ? "· ON STAGE NOW" : "· editing earlier team"}</div>
         <h2>${esc(team.project)}</h2>
         <div class="muted">${esc(team.members)}${team.department ? " · " + esc(team.department) : ""}</div>
         ${saved ? `<div class="small" style="margin-top:6px">✓ You submitted ${fmt(saved.total)} / ${maxTotal}. You can still change it while scoring is open.</div>` : ""}
+        </div>
       </div>
       <div class="card">
         ${criteria.map((c) => `<div class="crit">

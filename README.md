@@ -7,7 +7,8 @@ Open-source, free judging platform built for the **Ajou Technovate Hackathon 202
 - **Organizer panel** controls rounds, the team on stage, when scoring is open, and exports all results.
 - **Database** (Supabase, free tier) stores everything permanently; results can be downloaded as CSV/JSON and reused next year.
 
-- **Presentation portal**: each team uploads its PPT/PDF with its team code and private 6-digit upload code.
+- **Presentation portal**: each team uploads its PPT/PDF and a team photo with its team code and private 6-digit upload code.
+- **Team photos everywhere**: full-screen *Team intro* before each pitch, photos on the live board, podium, judge screens and organizer panel.
 - **Organizer dashboard**: teams, students, uploads, judging progress per round and judge, and a live activity feed.
 
 | Page | Who uses it |
@@ -38,7 +39,7 @@ Open <http://localhost:8080>. Demo PINs: organizer `0000`, judges `1111`, `2222`
 
 1. Create a free account at <https://supabase.com> and a **New project** (region: closest to Uzbekistan, e.g. Frankfurt).
 2. Open **SQL Editor → New query**, paste the whole of [`supabase/schema.sql`](supabase/schema.sql) and press **Run**.
-   Then do the same with [`supabase/002_presentations_dashboard.sql`](supabase/002_presentations_dashboard.sql) (presentation uploads + dashboard) and [`supabase/003_edit_judges.sql`](supabase/003_edit_judges.sql).
+   Then do the same with [`supabase/002_presentations_dashboard.sql`](supabase/002_presentations_dashboard.sql) (presentation uploads + dashboard) , [`supabase/003_edit_judges.sql`](supabase/003_edit_judges.sql) and [`supabase/004_team_photos.sql`](supabase/004_team_photos.sql).
 3. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into [`js/config.js`](js/config.js).
 4. Commit and push. Open `admin.html` — the first visit asks you to choose the organizer PIN.
 

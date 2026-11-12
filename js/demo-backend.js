@@ -87,7 +87,7 @@ export const demoBackend = {
       const avg = (f) => (s.length ? s.reduce((a, x) => a + f(x), 0) / s.length : 0);
       return { round_id: round, team_id: rt.team_id, code: t.code, project: t.project, members: t.members, department: t.department,
                position: rt.position, judges: s.length, score: +(avg((x) => x.total) * 100 / maxTotal).toFixed(2),
-               innovation: +avg((x) => +x.criteria["1"]).toFixed(2) };
+               innovation: +avg((x) => +x.criteria["1"]).toFixed(2), photo_path: t.photo_path || null };
     }));
   },
   getJudgeProgress() {
@@ -189,8 +189,19 @@ export const demoBackend = {
     if (!t) return delay(null);
     const p = db.presentations.find((x) => x.team_id === t.id) || {};
     return delay({ id: t.id, code: t.code, project: t.project, members: t.members, uploads_open: db.state.uploads_open,
-                   file_name: p.file_name, file_size: p.file_size, uploaded_at: p.uploaded_at, uploads: p.uploads || 0 });
+                   file_name: p.file_name, file_size: p.file_size, uploaded_at: p.uploaded_at, uploads: p.uploads || 0, photo_path: t.photo_path || null, photo_at: t.photo_at || null });
   },
+  photoUrl: (path) => (path ? files.get(path) || "" : ""),
+  async uploadPhoto(code, key, blob, onProgress) {
+    const db = load(), t = db.teams.find((x) => x.code.toUpperCase() === code.trim().toUpperCase() && x.upload_key === key.trim());
+    if (!t) throw new Error("Wrong team code or upload code");
+    if (!db.state.uploads_open) throw new Error("Uploads are closed by the organizer");
+    for (let i = 1; i <= 5; i++) { await new Promise((r) => setTimeout(r, 60)); onProgress?.(i / 5); }
+    const path = `${t.code}/${crypto.randomUUID()}.jpg`;
+    files.set(path, URL.createObjectURL(blob));
+    t.photo_path = path; t.photo_at = new Date().toISOString(); save(db); return path;
+  },
+  adminClearPhoto(pin, id) { needAdmin(pin); const db = load(), t = db.teams.find((x) => x.id === id); t.photo_path = null; t.photo_at = null; save(db); return delay(); },
   fileUrl: (path) => files.get(path) || "#",
   async uploadPresentation(code, key, file, onProgress) {
     const db = load(), t = db.teams.find((x) => x.code.toUpperCase() === code.trim().toUpperCase() && x.upload_key === key.trim());
@@ -209,7 +220,7 @@ export const demoBackend = {
     return delay(db.teams.slice().sort((a, b) => a.code.localeCompare(b.code)).map((t) => {
       const p = db.presentations.find((x) => x.team_id === t.id) || {};
       return { team_id: t.id, code: t.code, project: t.project, members: t.members, upload_key: t.upload_key,
-               file_path: p.file_path || null, file_name: p.file_name || null, file_size: p.file_size || null, uploads: p.uploads || 0, uploaded_at: p.uploaded_at || null };
+               file_path: p.file_path || null, file_name: p.file_name || null, file_size: p.file_size || null, uploads: p.uploads || 0, uploaded_at: p.uploaded_at || null, photo_path: t.photo_path || null, photo_at: t.photo_at || null };
     }));
   },
   adminActivity(pin, limit = 25) {
@@ -218,6 +229,7 @@ export const demoBackend = {
     const ev = [
       ...db.scores.map((s) => ({ at: s.updated_at, kind: "score", detail: `${ROUNDS[s.round_id - 1].name} · ${(db.judges.find((j) => j.id === s.judge_id) || {}).name} scored ${team(s.team_id).code} (${team(s.team_id).project}): ${s.total}` })),
       ...db.presentations.map((p) => ({ at: p.uploaded_at, kind: "upload", detail: `${team(p.team_id).code} (${team(p.team_id).project}) uploaded ${p.file_name}` })),
+      ...db.teams.filter((t) => t.photo_at).map((t) => ({ at: t.photo_at, kind: "photo", detail: `${t.code} (${t.project}) uploaded a team photo` })),
     ];
     return delay(ev.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, limit));
   },

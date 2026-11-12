@@ -120,7 +120,33 @@ export function teamsFromCsv(text) {
   });
 }
 
-export const fmtSize = (b) => (b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB");
+/** Team photo (or initials when there is none). size in px. */
+export function avatar(api, row, size = 48, cls = "") {
+  const url = row?.photo_path ? api.photoUrl(row.photo_path) : "";
+  const initials = String(row?.code || "?").replace(/^T/i, "") || "?";
+  return url
+    ? `<img class="avatar ${cls}" src="${esc(url)}" alt="" style="width:${size}px;height:${size}px" loading="lazy">`
+    : `<span class="avatar none ${cls}" style="width:${size}px;height:${size}px;font-size:${Math.round(size / 2.6)}px">${esc(initials)}</span>`;
+}
+
+/** Shrink a photo in the browser to max `edge` px (JPEG) so uploads are fast on venue Wi-Fi. */
+export function compressImage(file, edge = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, edge / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not read this image"))), "image/jpeg", quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("This file is not a supported image (use JPG or PNG).")); };
+    img.src = url;
+  });
+}
+
+export const fmtSize =(b) => (b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB");
 export const fmtTime = (t) => (t ? new Date(t).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
 export function clock(el) {

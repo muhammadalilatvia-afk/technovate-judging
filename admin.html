@@ -31,7 +31,7 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime } from "./js/common.js";
+import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -109,7 +109,7 @@ function control(pane, { st, boards, progress, pres }) {
       ${lineup.length ? "" : `<p class="muted">No teams in ${esc(round.name)} yet. Build the line-up in <b>Rounds &amp; line-ups</b>.</p>`}
       <div class="lineup"><table><thead><tr><th>#</th><th>Team</th><th>Project</th><th class="num">Judges</th><th class="num">Score</th><th></th></tr></thead><tbody>
       ${lineup.map((t, i) => `<tr class="${t.team_id === st.current_team_id ? "current" : ""}">
-        <td>${i + 1}</td><td><b>${esc(t.code)}</b></td><td>${esc(t.project)}<div class="muted small">${esc(t.members)}</div>
+        <td>${i + 1}</td><td><div class="row" style="gap:8px;flex-wrap:nowrap">${avatar(api, t, 38)}<b>${esc(t.code)}</b></div></td><td>${esc(t.project)}<div class="muted small">${esc(t.members)}</div>
         ${slides[t.team_id] ? `<a class="small" href="${esc(api.fileUrl(slides[t.team_id].file_path))}" target="_blank" rel="noopener">📎 ${esc(slides[t.team_id].file_name)}</a>` : `<span class="small" style="color:#fca5a5">No slides uploaded</span>`}</td>
         <td class="num">${t.judges}/${progress.length}</td><td class="num">${t.judges ? fmt(t.score) : "–"}</td>
         <td>${t.team_id === st.current_team_id ? `<span class="badge orange">ON STAGE</span>` : `<button class="btn" data-stage="${t.team_id}">Put on stage</button>`}</td></tr>`).join("")}
@@ -118,12 +118,12 @@ function control(pane, { st, boards, progress, pres }) {
     <section class="stack">
       <div class="card">
         <h2>Scoring</h2>
-        <div class="switch"><div><b>Judges can score</b><div class="muted small">Open after a team finishes presenting.</div></div>
+        <div class="switch"><div><b>Judges can score</b><div class="muted small">Open after a team finishes presenting (the screen switches from the team intro to the live board).</div></div>
           <button class="btn ${st.scoring_open ? "green" : ""}" id="scoring">${st.scoring_open ? "OPEN — click to close" : "CLOSED — click to open"}</button></div>
         <div class="switch"><div><b>Scores visible on live screen</b><div class="muted small">Hide to keep results secret until the announcement.</div></div>
           <button class="btn ${st.show_scores ? "green" : ""}" id="show">${st.show_scores ? "VISIBLE" : "HIDDEN"}</button></div>
         <div class="switch"><div><b>Live screen view</b></div>
-          <div class="seg">${[["welcome", "Welcome"], ["board", "Live board"], ["podium", "Winners"]].map(([k, l]) => `<button data-view="${k}" class="${st.view === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
+          <div class="seg">${[["welcome", "Welcome"], ["intro", "Team intro"], ["board", "Live board"], ["podium", "Winners"]].map(([k, l]) => `<button data-view="${k}" class="${st.view === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
         <label class="field" style="margin-top:10px"><span>Announcement on the screen's bottom bar (empty = show next team)</span>
           <div class="row"><input type="text" id="msg" value="${esc(st.message)}" style="flex:1"><button class="btn" id="msgbtn">Show</button></div></label>
       </div>
@@ -136,12 +136,12 @@ function control(pane, { st, boards, progress, pres }) {
 
   const set = (patch, msg) => run(() => api.adminSetState(pin, patch), msg).then(render);
   pane.querySelectorAll("[data-round]").forEach((b) => b.onclick = () => set({ active_round: Number(b.dataset.round), current_team_id: null, scoring_open: false }, "Round changed"));
-  pane.querySelectorAll("[data-stage]").forEach((b) => b.onclick = () => set({ current_team_id: Number(b.dataset.stage), scoring_open: false }));
+  pane.querySelectorAll("[data-stage]").forEach((b) => b.onclick = () => set({ current_team_id: Number(b.dataset.stage), scoring_open: false, view: "intro" }));
   pane.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => set({ view: b.dataset.view }));
-  const go = (i) => lineup[i] && set({ current_team_id: lineup[i].team_id, scoring_open: false });
+  const go = (i) => lineup[i] && set({ current_team_id: lineup[i].team_id, scoring_open: false, view: "intro" });
   document.getElementById("prev").onclick = () => go(curIdx - 1);
   document.getElementById("next").onclick = () => go(curIdx + 1);
-  document.getElementById("scoring").onclick = () => set({ scoring_open: !st.scoring_open });
+  document.getElementById("scoring").onclick = () => set(st.scoring_open ? { scoring_open: false } : { scoring_open: true, view: "board" });
   document.getElementById("show").onclick = () => set({ show_scores: !st.show_scores });
   document.getElementById("msgbtn").onclick = () => set({ message: document.getElementById("msg").value.trim() }, "Announcement updated");
 }
@@ -168,6 +168,7 @@ function dashboard(pane, { st, teams, boards, judges, progress, pres, activity }
       ${stat("Teams", teams.length, `${teams.filter((t) => t.round1).length} in Round 1 · ${teams.filter((t) => !t.round1).length} from Round 2`)}
       ${stat("Students", students, "registered participants")}
       ${stat("Presentations", `${uploaded.length}<span class="muted" style="font-size:20px">/${pres.length}</span>`, `${pres.length ? Math.round(uploaded.length / pres.length * 100) : 0}% uploaded`)}
+      ${stat("Team photos", `${teams.filter((t) => t.photo_path).length}<span class="muted" style="font-size:20px">/${teams.length}</span>`, "shown on the big screen")}
       ${stat("Judges", activeJudges, `${progress.filter((j) => j.scored_current).length} scored the team on stage`)}
       ${stat("Now", esc(round.name), cur ? `On stage: ${esc(cur.code)} · scoring ${st.scoring_open ? "open" : "closed"}` : "No team on stage")}
     </div>
@@ -184,7 +185,7 @@ function dashboard(pane, { st, teams, boards, judges, progress, pres, activity }
       </section>
       <section class="card"><h2>Recent activity</h2>
         <div style="max-height:430px;overflow:auto">${activity.map((a) => `<div style="padding:7px 0;border-bottom:1px solid var(--line)">
-          <span class="badge ${a.kind === "upload" ? "ok" : "orange"}">${a.kind === "upload" ? "UPLOAD" : "SCORE"}</span>
+          <span class="badge ${a.kind === "score" ? "orange" : "ok"}">${a.kind === "upload" ? "UPLOAD" : a.kind === "photo" ? "PHOTO" : "SCORE"}</span>
           <span class="muted small">${fmtTime(a.at)}</span><div class="small">${esc(a.detail)}</div></div>`).join("") || `<p class="muted">Nothing yet. Uploads and scores appear here live.</p>`}</div>
       </section>
     </div>
@@ -196,15 +197,15 @@ function dashboard(pane, { st, teams, boards, judges, progress, pres, activity }
 
 // ---------------------------------------------------------- presentations --
 function presentationsPane(pane, { pres }) {
-  const done = pres.filter((p) => p.file_name).length;
+  const done = pres.filter((p) => p.file_name).length, photos = pres.filter((p) => p.photo_path).length;
   pane.innerHTML = `<section class="card">
-    <div class="row" style="margin-bottom:12px"><h2 style="margin:0">Presentations · ${done}/${pres.length} uploaded</h2><span style="flex:1"></span>
+    <div class="row" style="margin-bottom:12px"><h2 style="margin:0">Presentations · ${done}/${pres.length} uploaded · 📸 ${photos}/${pres.length} photos</h2><span style="flex:1"></span>
       <button class="btn" id="codes">⬇ Team upload codes (CSV)</button><button class="btn" id="links">⬇ File links (CSV)</button>
       <button class="btn" id="showkeys">Show upload codes</button></div>
     <p class="muted small">Send each team leader their team code and 6-digit upload code (for example in Telegram). Students upload on the <a href="upload.html" target="_blank">upload page</a>.
       Files are stored in Supabase Storage; links are long and unguessable.</p>
-    <table><thead><tr><th>Team</th><th>Project</th><th>Upload code</th><th>File</th><th>Size</th><th>Uploaded</th></tr></thead><tbody>
-    ${pres.map((p) => `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.project)}<div class="muted small">${esc(p.members)}</div></td>
+    <table><thead><tr><th>Photo</th><th>Team</th><th>Project</th><th>Upload code</th><th>File</th><th>Size</th><th>Uploaded</th></tr></thead><tbody>
+    ${pres.map((p) => `<tr><td>${p.photo_path ? `<a href="${esc(api.photoUrl(p.photo_path))}" target="_blank" rel="noopener">${avatar(api, p, 52, "sq")}</a><div><button class="btn danger small" data-clearphoto="${p.team_id}" style="padding:2px 8px;margin-top:4px">Remove</button></div>` : `<span class="muted small">No photo</span>`}</td><td><b>${esc(p.code)}</b></td><td>${esc(p.project)}<div class="muted small">${esc(p.members)}</div></td>
       <td><code class="key" data-key="${esc(p.upload_key)}">••••••</code></td>
       <td>${p.file_name ? `<a href="${esc(api.fileUrl(p.file_path))}" target="_blank" rel="noopener">📎 ${esc(p.file_name)}</a>${p.uploads > 1 ? ` <span class="muted small">v${p.uploads}</span>` : ""}` : `<span style="color:#fca5a5">Not uploaded</span>`}</td>
       <td class="small">${p.file_size ? fmtSize(p.file_size) : ""}</td><td class="small">${fmtTime(p.uploaded_at)}</td></tr>`).join("")}
@@ -214,6 +215,10 @@ function presentationsPane(pane, { pres }) {
     pane.querySelectorAll(".key").forEach((k) => { k.textContent = show ? k.dataset.key : "••••••"; });
     e.target.textContent = show ? "Hide upload codes" : "Show upload codes";
   };
+  pane.querySelectorAll("[data-clearphoto]").forEach((b) => b.onclick = async () => {
+    if (!confirm("Remove this team photo? The team can upload a new one.")) return;
+    await run(() => api.adminClearPhoto(pin, Number(b.dataset.clearphoto)), "Photo removed"); render();
+  });
   document.getElementById("codes").onclick = () => download("team-upload-codes.csv", toCsv([["team_code", "project", "members", "upload_code", "upload_page"],
     ...pres.map((p) => [p.code, p.project, p.members, p.upload_key, new URL("upload.html", location.href).href])]));
   document.getElementById("links").onclick = () => download("presentation-links.csv", toCsv([["team_code", "project", "file_name", "url", "uploaded_at"],
