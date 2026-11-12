@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Judge – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="40" height="40">
+    <span><b>AJOU TECHNOVATE</b><small>HACKATHON 3.0 · JUDGE</small></span></a>
+  <span class="spacer"></span>
+  <span id="mode"></span>
+  <span id="who" class="muted"></span>
+  <button class="btn hidden" id="logout">Log out</button>
+</header>
+
+<main class="wrap" id="app"></main>
+
+<script type="module">
+import { getApi, esc, fmt, toast, modeBadge } from "./js/common.js";
+const api = await getApi();
+document.getElementById("mode").innerHTML = modeBadge(api);
+const app = document.getElementById("app");
+const [rounds, criteria] = await Promise.all([api.getRounds(), api.getCriteria()]);
+const maxTotal = criteria.reduce((a, c) => a + c.max_points, 0);
+
+let pin = sessionStorage.getItem("judgePin");
+let me = null;
+let selectedTeam = null;      // team the judge is editing (null = follow the stage)
+let draft = {};               // { [teamId]: { criteria: {}, comment } } unsaved input
+
+function loginView(msg = "") {
+  document.getElementById("logout").classList.add("hidden");
+  document.getElementById("who").textContent = "";
+  app.innerHTML = `<div class="card" style="max-width:440px;margin:60px auto">
+    <h2>Judge login</h2>
+    <p class="muted">Enter the PIN the organizer gave you.</p>
+    ${api.mode === "demo" ? `<p class="small"><span class="badge demo">DEMO</span> PINs: 1111, 2222, 3333</p>` : ""}
+    <form id="f" class="stack"><label class="field"><span>Judge PIN</span>
+      <input type="password" id="pin" inputmode="numeric" autocomplete="off" autofocus required></label>
+      ${msg ? `<div class="toast err" style="position:static">${esc(msg)}</div>` : ""}
+      <button class="btn primary big" style="width:100%;justify-content:center">Log in</button></form></div>`;
+  document.getElementById("f").onsubmit = async (e) => {
+    e.preventDefault();
+    const p = document.getElementById("pin").value.trim();
+    try {
+      const j = await api.judgeLogin(p);
+      if (!j) return loginView("Wrong PIN. Please try again.");
+      pin = p; me = j; sessionStorage.setItem("judgePin", p); start();
+    } catch (err) { loginView(err.message); }
+  };
+}
+
+async function render() {
+  const st = await api.getState();
+  const round = rounds.find((r) => r.id === st.active_round) || rounds[0];
+  const [lineup, mine] = await Promise.all([api.getLeaderboard(round.id), api.judgeScores(pin, round.id)]);
+  lineup.sort((a, b) => a.position - b.position);
+  const myScore = Object.fromEntries(mine.map((s) => [s.team_id, s]));
+  const teamId = selectedTeam ?? st.current_team_id;
+  const team = lineup.find((t) => t.team_id === teamId);
+  const following = selectedTeam === null;
+  const done = mine.length;
+
+  // keep in-progress input when the screen refreshes
+  const saved = team ? myScore[team.team_id] : null;
+  const d = team ? (draft[team.team_id] ??= { criteria: { ...(saved?.criteria || {}) }, comment: saved?.comment || "" }) : null;
+  const total = d ? criteria.reduce((a, c) => a + (Number(d.criteria[c.id]) || 0), 0) : 0;
+  const complete = d && criteria.every((c) => d.criteria[c.id] !== undefined);
+  const canScore = st.scoring_open && team;
+
+  app.innerHTML = `
+  <div class="grid" style="grid-template-columns: minmax(0,1fr) 300px; gap:20px">
+    <section class="stack">
+      <div class="row"><span class="badge orange">${esc(round.name)}</span>
+        <span class="badge ${st.scoring_open ? "ok" : "off"}">${st.scoring_open ? "SCORING OPEN" : "SCORING CLOSED"}</span>
+        ${!following ? `<button class="btn" id="follow">↩ Back to team on stage</button>` : ""}</div>
+      ${team ? `
+      <div class="teamhero">
+        <div class="code">${esc(team.code)} ${team.team_id === st.current_team_id ? "· ON STAGE NOW" : "· editing earlier team"}</div>
+        <h2>${esc(team.project)}</h2>
+        <div class="muted">${esc(team.members)}${team.department ? " · " + esc(team.department) : ""}</div>
+        ${saved ? `<div class="small" style="margin-top:6px">✓ You submitted ${fmt(saved.total)} / ${maxTotal}. You can still change it while scoring is open.</div>` : ""}
+      </div>
+      <div class="card">
+        ${criteria.map((c) => `<div class="crit">
+          <div class="head"><div><b>${esc(c.name)}</b><div class="muted small">${esc(c.description)}</div></div>
+            <div class="val">${d.criteria[c.id] ?? "–"}</div></div>
+          <div class="scale">${Array.from({ length: c.max_points + 1 }, (_, v) =>
+            `<button type="button" data-c="${c.id}" data-v="${v}" class="${Number(d.criteria[c.id]) === v && d.criteria[c.id] !== undefined ? "on" : ""}" ${canScore ? "" : "disabled"}>${v}</button>`).join("")}</div>
+        </div>`).join("")}
+        <label class="field" style="margin-top:14px"><span>Comment (optional, only organizers see it)</span>
+          <textarea id="comment" ${canScore ? "" : "disabled"}>${esc(d.comment)}</textarea></label>
+        <div class="row" style="justify-content:space-between;margin-top:14px">
+          <div><div class="muted small">TOTAL</div><div class="total">${total} <span class="muted" style="font-size:22px">/ ${maxTotal}</span></div></div>
+          <button class="btn primary big" id="submit" ${canScore && complete ? "" : "disabled"}>${saved ? "Update score" : "Submit score"}</button>
+        </div>
+        ${!st.scoring_open ? `<p class="muted">Scoring opens when the organizer starts it.</p>` : !complete ? `<p class="muted small">Choose a score for every criterion to submit.</p>` : ""}
+      </div>` : `<div class="card"><h2>Waiting for the next team…</h2><p class="muted">Your screen switches automatically when the organizer puts a team on stage.</p></div>`}
+    </section>
+    <aside class="card">
+      <h2>${esc(round.name)} teams</h2>
+      <p class="muted small">You scored ${done} of ${lineup.length}. Tap a team to review or correct your score.</p>
+      <div class="pill-list">${lineup.map((t) => `<button data-team="${t.team_id}" class="${myScore[t.team_id] ? "done" : ""} ${team && t.team_id === team.team_id ? "sel" : ""}"
+        title="${esc(t.project)}">${esc(t.code)}${myScore[t.team_id] ? " ✓" : ""}</button>`).join("")}</div>
+    </aside>
+  </div>`;
+
+  app.querySelectorAll(".scale button").forEach((b) => b.onclick = () => {
+    d.criteria[b.dataset.c] = Number(b.dataset.v); render();
+  });
+  const cm = document.getElementById("comment");
+  if (cm) cm.oninput = () => { d.comment = cm.value; };
+  app.querySelectorAll("[data-team]").forEach((b) => b.onclick = () => {
+    const id = Number(b.dataset.team); selectedTeam = id === st.current_team_id ? null : id; render();
+  });
+  const fb = document.getElementById("follow"); if (fb) fb.onclick = () => { selectedTeam = null; render(); };
+  const sb = document.getElementById("submit");
+  if (sb) sb.onclick = async () => {
+    sb.disabled = true;
+    try {
+      const tot = await api.submitScore(pin, round.id, team.team_id, d.criteria, d.comment);
+      delete draft[team.team_id];
+      toast(`Saved: ${team.code} — ${fmt(tot)} / ${maxTotal}`);
+      selectedTeam = null;
+      await render();
+    } catch (err) { toast(err.message, "err"); sb.disabled = false; }
+  };
+}
+
+let busy = false, again = false;
+async function safeRender() {
+  if (busy) { again = true; return; }
+  busy = true;
+  try { await render(); } catch (e) { toast(e.message, "err"); if (/PIN/.test(e.message)) { sessionStorage.removeItem("judgePin"); loginView(e.message); } }
+  busy = false; if (again) { again = false; safeRender(); }
+}
+
+let unsub = null;
+async function start() {
+  if (!me) { me = await api.judgeLogin(pin); if (!me) { sessionStorage.removeItem("judgePin"); return loginView(); } }
+  document.getElementById("who").textContent = me.name;
+  const lo = document.getElementById("logout");
+  lo.classList.remove("hidden");
+  lo.onclick = () => { sessionStorage.removeItem("judgePin"); pin = null; me = null; unsub?.(); loginView(); };
+  // Don't re-render while the judge is typing a comment
+  unsub = api.subscribe(() => { if (document.activeElement?.id !== "comment") safeRender(); });
+  safeRender();
+}
+
+pin ? start() : loginView();
+</script>
+</body>
+</html>

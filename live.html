@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Results – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body class="live">
+<header class="live-top">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="54" height="54">
+    <span><b style="font-size:24px">AJOU TECHNOVATE</b><small style="font-size:13px">HACKATHON 3.0 · LIVE RESULTS</small></span></a>
+  <span class="spacer" style="flex:1"></span>
+  <div class="round" id="round">Round 1</div>
+  <span id="mode"></span>
+  <div class="clock" id="clock"></div>
+  <img class="uni-logo" src="assets/ajou-logo.png" alt="" style="width:54px;height:54px">
+</header>
+
+<main id="screen"></main>
+
+<footer class="live-foot" id="foot"></footer>
+
+<script type="module">
+import { getApi, esc, fmt, rank, modeBadge, clock } from "./js/common.js";
+const api = await getApi();
+document.getElementById("mode").innerHTML = modeBadge(api);
+clock(document.getElementById("clock"));
+
+const [rounds, criteria] = await Promise.all([api.getRounds(), api.getCriteria()]);
+const screen = document.getElementById("screen");
+let lastCurrentAllDone = null;
+let lastHtml = "";
+const setScreen = (html) => { if (html !== lastHtml) { lastHtml = html; screen.innerHTML = html; } };
+
+async function render() {
+  const st = await api.getState();
+  const round = rounds.find((r) => r.id === st.active_round) || rounds[0];
+  const [board, judges] = await Promise.all([api.getLeaderboard(round.id), api.getJudgeProgress()]);
+  const ranked = rank(board);
+  const order = [...board].sort((a, b) => a.position - b.position);
+  const cur = board.find((r) => r.team_id === st.current_team_id);
+  const curIdx = order.findIndex((r) => r.team_id === st.current_team_id);
+  const next = curIdx >= 0 ? order[curIdx + 1] : order.find((r) => !r.judges);
+  const scoredCount = board.filter((r) => r.judges > 0).length;
+
+  document.getElementById("round").innerHTML = `${esc(round.name)} <span>· ${scoredCount}/${board.length} teams</span>`;
+  document.getElementById("foot").innerHTML = st.message
+    ? `<b>📢</b> ${esc(st.message)}`
+    : next ? `<b>NEXT UP</b> ${esc(next.code)} · ${esc(next.project)}` : `<b>${esc(round.name)}</b> ${esc(round.description)}`;
+
+  if (st.view === "welcome") {
+    setScreen(`<div class="center-screen">
+      <img src="assets/technovate-mark.svg" width="230" alt="" class="reveal">
+      <h1>AJOU TECHNOVATE <span>HACKATHON 2026</span></h1>
+      <div style="font-size:30px" class="muted">Your Innovation. Your Idea. Your Stage.</div>
+      <div class="badge orange" style="font-size:22px;padding:8px 22px">${esc(round.name)} · ${esc(round.description)}</div></div>`);
+    return;
+  }
+  if (st.view === "podium") {
+    const top = ranked.filter((r) => r.judges > 0).slice(0, 3);
+    const pod = (r, p) => r ? `<div class="pod p${p} reveal" style="animation-delay:${(3 - p) * .5}s">
+        <div class="place">${["🥇", "🥈", "🥉"][p - 1]}</div><div class="code badge orange">${esc(r.code)}</div>
+        <div class="proj">${esc(r.project)}</div><div class="muted">${esc(r.members)}</div>
+        <div class="score">${fmt(r.score)} / 100</div></div>` : `<div></div>`;
+    setScreen(`<div class="center-screen"><h1 style="font-size:56px">${esc(round.name)} <span>winners</span></h1>
+      <div class="podium">${pod(top[1], 2)}${pod(top[0], 1)}${pod(top[2], 3)}</div></div>`);
+    return;
+  }
+
+  // board view
+  const allDone = cur && judges.length && judges.every((j) => j.scored_current);
+  const showCurScore = cur && allDone && st.show_scores;
+  const nowHtml = cur ? `
+      <div class="label">NOW PRESENTING</div>
+      <div><span class="code">${esc(cur.code)}</span></div>
+      <div class="proj">${esc(cur.project)}</div>
+      <div class="members">${esc(cur.members)}</div>
+      <div class="muted" style="font-size:18px">${esc(cur.department)}</div>
+      <div class="judges">${judges.map((j) => `<div class="judge-chip ${j.scored_current ? "done" : ""}">
+          <b>${esc(j.name)}</b><span>${j.scored_current ? "✓ Scored" : (st.scoring_open ? "Scoring…" : "Waiting")}</span></div>`).join("")}</div>
+      ${showCurScore ? `<div class="bigscore ${lastCurrentAllDone === cur.team_id ? "" : "reveal"}"><div class="num">${fmt(cur.score)}</div><div class="of">/ 100<br>
+          <span style="font-size:22px">Rank #${ranked.find((r) => r.team_id === cur.team_id)?.rank ?? "–"} of ${board.length}</span></div></div>`
+        : `<div class="muted" style="font-size:22px">${st.scoring_open ? "Judges are scoring…" : "Scoring opens after the presentation"}</div>`}`
+    : `<div class="label">GET READY</div><div class="proj">${esc(round.name)}</div><div class="members">${esc(round.description)}</div>`;
+  lastCurrentAllDone = showCurScore ? cur.team_id : null;
+
+  const visible = st.show_scores;
+  const rows = ranked.filter((r) => r.judges > 0);
+  const fit = Math.min(rows.length, 22);
+  const h = Math.max(30, Math.min(52, Math.floor(((window.innerHeight - 92 - 58 - 48 - 70) / Math.max(fit, 8)))));
+  let list = "";
+  rows.slice(0, 22).forEach((r, i) => {
+    list += `<div class="lb-row ${r.rank <= round.qualify_top ? "q" : ""} ${r.rank <= 3 ? "top3" : ""} ${r.team_id === st.current_team_id ? "cur" : ""}" style="height:${h}px">
+      <div class="bar" style="width:${Math.max(4, r.score)}%"></div>
+      <div class="rk">${r.rank}</div><div class="cd">${esc(r.code)}</div><div class="pj">${esc(r.project)}</div><div class="sc">${fmt(r.score)}${r.judges < judges.length ? `<small class="muted" style="font-size:12px;display:block;line-height:1">${r.judges}/${judges.length} judges</small>` : ""}</div></div>`;
+    if (i + 1 === round.qualify_top && rows.length > round.qualify_top)
+      list += `<div class="cutline"><span>${round.id < 3 ? `TOP ${round.qualify_top} QUALIFY` : "WINNERS"}</span></div>`;
+  });
+  setScreen(`<div class="live-main">
+    <section class="now">${nowHtml}</section>
+    <section class="board"><h3>Live ranking <small>${rows.length} scored · ${round.id < 3 ? `top ${round.qualify_top} advance` : "top 3 win"}</small></h3>
+      <div class="board-list">${visible ? (list || `<div class="muted" style="padding:20px;font-size:20px">Scores will appear here as judges submit them.</div>`)
+        : `<div class="center-screen" style="height:100%"><div style="font-size:64px">🔒</div><h2>Results are hidden</h2><div class="muted">They will be revealed by the organizer.</div></div>`}</div>
+    </section></div>`);
+}
+
+let pending = false;
+const refresh = () => { if (pending) return; pending = true; setTimeout(async () => { pending = false; try { await render(); } catch (e) { console.error(e); } }, 150); };
+api.subscribe(refresh);
+window.addEventListener("resize", refresh);
+await render();
+</script>
+</body>
+</html>

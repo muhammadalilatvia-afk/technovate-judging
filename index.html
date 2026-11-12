@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ajou Technovate Hackathon 3.0 – Judging</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 30px; align-items: center; padding: 40px 0 10px; }
+  .hero h1 { font-size: clamp(36px, 5vw, 64px); font-weight: 900; letter-spacing: -1px; }
+  .hero h1 span { color: var(--orange); display: block; }
+  .hero p { font-size: 18px; color: var(--muted); max-width: 560px; }
+  .hero img.mark { width: min(320px, 70%); justify-self: center; filter: drop-shadow(0 20px 50px rgba(247,147,30,.35)); }
+  .tile { display: block; text-decoration: none; color: var(--text); transition: .2s; }
+  .tile:hover { transform: translateY(-3px); border-color: rgba(247,147,30,.6); }
+  .tile .ico { font-size: 34px; }
+  .tile h2 { margin-top: 10px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+  @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } .hero img.mark { display: none; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="40" height="40">
+    <span><b>AJOU TECHNOVATE</b><small>HACKATHON 3.0</small></span></a>
+  <span class="spacer"></span>
+  <span id="mode"></span>
+  <img class="uni-logo" src="assets/ajou-logo.png" alt="Ajou University in Tashkent">
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <div class="badge orange">18 NOVEMBER 2026 · ANGOR HALL</div>
+      <h1>Ajou Technovate<span>Hackathon 2026</span></h1>
+      <p>Digital judging for the Ajou University in Tashkent innovation challenge. Judges score each team online, and results update live on the big screen.</p>
+      <div class="facts">
+        <span class="badge">Round 1 · IT Business 3rd year · Top 20 qualify</span>
+        <span class="badge">Round 2 · All Ajou teams · Top 5 qualify</span>
+        <span class="badge">Final · Top 3 win</span>
+      </div>
+    </div>
+    <img class="mark" src="assets/technovate-mark.svg" alt="">
+  </section>
+
+  <section class="grid cols-3" style="margin-top:20px">
+    <a class="card tile" href="live.html"><div class="ico">📺</div><h2>Live results screen</h2>
+      <p class="muted">Open on the projector. Shows the team on stage, judges' progress and the live ranking.</p></a>
+    <a class="card tile" href="judge.html"><div class="ico">⚖️</div><h2>Judge scoring</h2>
+      <p class="muted">For the 5 judges' computers. Log in with your judge PIN and score the team on stage.</p></a>
+    <a class="card tile" href="admin.html"><div class="ico">🛠️</div><h2>Organizer control</h2>
+      <p class="muted">Import teams, set the round and the team on stage, open scoring, export results.</p></a>
+  </section>
+
+  <section class="card" style="margin-top:20px">
+    <h2>How judging works</h2>
+    <div class="grid cols-3 small">
+      <div><b>1 · Team on stage</b><p class="muted">The organizer selects the team that is presenting. Every judge's screen switches to it automatically.</p></div>
+      <div><b>2 · Judges score</b><p class="muted">5 criteria, 0–10 each: innovation, real-world value, feasibility, market potential and presentation.</p></div>
+      <div><b>3 · Live ranking</b><p class="muted">The team's score is the judges' average out of 100. Ties are broken by the innovation score.</p></div>
+    </div>
+  </section>
+  <p class="muted small" style="text-align:center;margin-top:30px">Ajou University in Tashkent · Open-source judging system · <a href="https://t.me/AJOUH2025">Telegram</a></p>
+</main>
+<script type="module">
+  import { getApi, modeBadge } from "./js/common.js";
+  const api = await getApi();
+  document.getElementById("mode").innerHTML = modeBadge(api) || '<span class="badge ok">LIVE DATABASE</span>';
+</script>
+</body>
+</html>

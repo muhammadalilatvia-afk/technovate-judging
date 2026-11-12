@@ -1,0 +1,9 @@
+# Never commit participant data or exports
+private/
+*.private.csv
+exports/
+technovate-backup-*.json
+ranking-*.csv
+judge-scores-*.csv
+.DS_Store
+Thumbs.db
