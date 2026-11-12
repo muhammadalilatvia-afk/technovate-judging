@@ -1,11 +1,11 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, EVENT, FORCE_DEMO, UPLOAD } from "./config.js";
-import { demoBackend } from "./demo-backend.js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, EVENT, FORCE_DEMO, UPLOAD } from "./config.js?v=20261113a";
+import { demoBackend } from "./demo-backend.js?v=20261113a";
 
 export { EVENT, UPLOAD };
 
 export async function getApi() {
   if (SUPABASE_URL && SUPABASE_ANON_KEY && !FORCE_DEMO) {
-    const { supabaseBackend } = await import("./supabase-backend.js");
+    const { supabaseBackend } = await import("./supabase-backend.js?v=20261113a");
     return supabaseBackend(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
   return demoBackend;

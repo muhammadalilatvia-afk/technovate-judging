@@ -98,3 +98,7 @@ Change dates and texts in `js/config.js`, `index.html` and the rounds/criteria r
 ## License
 
 MIT — free to use and adapt.
+
+## Updating the site
+
+After changing any file in `js/` or `assets/app.css`, change the version stamp `?v=...` in the five HTML pages and in `js/common.js` (search for `?v=`) so browsers load the new files immediately instead of a cached copy.

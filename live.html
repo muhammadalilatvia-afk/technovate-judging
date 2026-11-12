@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Live Results – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css">
+<link rel="stylesheet" href="assets/app.css?v=20261113a">
 </head>
 <body class="live">
 <header class="live-top">
@@ -23,7 +23,7 @@
 <footer class="live-foot" id="foot"></footer>
 
 <script type="module">
-import { getApi, esc, fmt, rank, modeBadge, clock, avatar } from "./js/common.js";
+import { getApi, esc, fmt, rank, modeBadge, clock, avatar } from "./js/common.js?v=20261113a";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 clock(document.getElementById("clock"));
@@ -37,7 +37,7 @@ const setScreen = (html) => { if (html !== lastHtml) { lastHtml = html; screen.i
 async function render() {
   const st = await api.getState();
   const round = rounds.find((r) => r.id === st.active_round) || rounds[0];
-  const [board, judges, rstatus] = await Promise.all([api.getLeaderboard(round.id), api.getJudgeProgress(), api.getRoundStatus().catch(() => [])]);
+  const [board, judges, rstatus] = await Promise.all([api.getLeaderboard(round.id), api.getJudgeProgress(), (api.getRoundStatus ? api.getRoundStatus().catch(() => []) : [])]);
   const done = (rstatus || []).find((r) => r.round_id === round.id)?.complete;
   const ranked = rank(board);
   const order = [...board].sort((a, b) => a.position - b.position);
