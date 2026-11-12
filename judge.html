@@ -21,6 +21,11 @@
 
 <script type="module">
 import { getApi, esc, fmt, toast, modeBadge } from "./js/common.js";
+import { QUESTIONS, FOLLOW_UPS } from "./js/questions.js";
+// Question helper state: which question is highlighted, and which were already asked per team (this browser only).
+let qPick = null, qTeam = null;
+const asked = (() => { try { return JSON.parse(sessionStorage.getItem("askedQ") || "{}"); } catch { return {}; } })();
+const saveAsked = () => { try { sessionStorage.setItem("askedQ", JSON.stringify(asked)); } catch {} };
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -73,7 +78,7 @@ async function render() {
   const canScore = st.scoring_open && team;
 
   app.innerHTML = `
-  <div class="grid" style="grid-template-columns: minmax(0,1fr) 300px; gap:20px">
+  <div class="grid judge-grid">
     <section class="stack">
       <div class="row"><span class="badge orange">${esc(round.name)}</span>
         <span class="badge ${st.scoring_open ? "ok" : "off"}">${st.scoring_open ? "SCORING OPEN" : "SCORING CLOSED"}</span>
@@ -101,14 +106,30 @@ async function render() {
         ${!st.scoring_open ? `<p class="muted">Scoring opens when the organizer starts it.</p>` : !complete ? `<p class="muted small">Choose a score for every criterion to submit.</p>` : ""}
       </div>` : `<div class="card"><h2>Waiting for the next team…</h2><p class="muted">Your screen switches automatically when the organizer puts a team on stage.</p></div>`}
     </section>
-    <aside class="card">
-      <h2>${esc(round.name)} teams</h2>
-      <p class="muted small">You scored ${done} of ${lineup.length}. Tap a team to review or correct your score.</p>
-      <div class="pill-list">${lineup.map((t) => `<button data-team="${t.team_id}" class="${myScore[t.team_id] ? "done" : ""} ${team && t.team_id === team.team_id ? "sel" : ""}"
-        title="${esc(t.project)}">${esc(t.code)}${myScore[t.team_id] ? " ✓" : ""}</button>`).join("")}</div>
+    <aside class="stack">
+      ${questionsCard(team)}
+      <div class="card">
+        <h2>${esc(round.name)} teams</h2>
+        <p class="muted small">You scored ${done} of ${lineup.length}. Tap a team to review or correct your score.</p>
+        <div class="pill-list">${lineup.map((t) => `<button data-team="${t.team_id}" class="${myScore[t.team_id] ? "done" : ""} ${team && t.team_id === team.team_id ? "sel" : ""}"
+          title="${esc(t.project)}">${esc(t.code)}${myScore[t.team_id] ? " ✓" : ""}</button>`).join("")}</div>
+      </div>
     </aside>
   </div>`;
 
+  const key = team ? String(team.team_id) : "none";
+  const rnd = document.getElementById("rndq");
+  if (rnd) rnd.onclick = () => {
+    const done = asked[key] || [];
+    const pool = QUESTIONS.map((_, i) => i).filter((i) => !done.includes(i) && i !== qPick);
+    const from = pool.length ? pool : QUESTIONS.map((_, i) => i).filter((i) => i !== qPick);
+    qPick = from[Math.floor(Math.random() * from.length)]; render();
+  };
+  app.querySelectorAll("[data-q]").forEach((li) => li.onclick = () => { qPick = Number(li.dataset.q); render(); });
+  const mark = document.getElementById("qasked");
+  if (mark) mark.onclick = () => {
+    asked[key] = [...new Set([...(asked[key] || []), qPick])]; saveAsked(); qPick = null; render();
+  };
   app.querySelectorAll(".scale button").forEach((b) => b.onclick = () => {
     d.criteria[b.dataset.c] = Number(b.dataset.v); render();
   });
@@ -129,6 +150,26 @@ async function render() {
       await render();
     } catch (err) { toast(err.message, "err"); sb.disabled = false; }
   };
+}
+
+function questionsCard(team) {
+  const key = team ? String(team.team_id) : "none";
+  if (qTeam !== key) { qTeam = key; qPick = null; }   // new team on stage → fresh question
+  const done = asked[key] || [];
+  const p = qPick !== null ? QUESTIONS[qPick] : null;
+  return `<div class="card qcard">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">💬 Questions to ask</h2>
+      <button class="btn primary" id="rndq" title="Pick a question you have not asked this team yet">🎲 Random</button></div>
+    ${p ? `<div class="qpick"><span class="badge orange">${esc(p.tag)}</span>
+        <div class="qq">${esc(p.q)}</div>
+        <div class="small"><b>Listen for:</b> ${esc(p.listen)}</div>
+        <button class="btn" id="qasked" style="margin-top:8px">✓ Asked</button></div>`
+      : `<p class="muted small" style="margin:8px 0">Ask 1–2 questions after the pitch. Tap a question or press 🎲 Random.</p>`}
+    <ol class="qlist">${QUESTIONS.map((x, i) => `<li data-q="${i}" class="${i === qPick ? "on" : ""} ${done.includes(i) ? "done" : ""}">
+      ${done.includes(i) ? "✓ " : ""}${esc(x.q)}</li>`).join("")}</ol>
+    <details class="small"><summary>Track follow-ups</summary>
+      ${FOLLOW_UPS.map(([t, q]) => `<p style="margin:6px 0"><b>${esc(t)}:</b> ${esc(q)}</p>`).join("")}</details>
+  </div>`;
 }
 
 let busy = false, again = false;

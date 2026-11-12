@@ -71,6 +71,17 @@ tr.cut td { border-bottom: 2px dashed var(--orange); }
 .toast.err { background: #450a0a; border-color: #ef4444; }
 
 /* ---------- judge scoring ---------- */
+.judge-grid { grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; }
+@media (max-width: 1000px) { .judge-grid { grid-template-columns: 1fr; } }
+.qcard h2 { font-size: 17px; }
+.qpick { margin: 10px 0; padding: 12px 14px; border-radius: 12px; background: rgba(247,147,30,.14); border: 1px solid rgba(247,147,30,.55); }
+.qpick .qq { font-size: 19px; font-weight: 800; line-height: 1.3; margin: 8px 0 6px; }
+.qlist { margin: 8px 0; padding-left: 20px; }
+.qlist li { padding: 6px 4px; border-radius: 8px; cursor: pointer; font-size: 14px; line-height: 1.35; }
+.qlist li:hover { background: rgba(255,255,255,.06); }
+.qlist li.on { background: rgba(247,147,30,.18); font-weight: 700; }
+.qlist li.done { color: var(--muted); }
+details summary { cursor: pointer; color: var(--orange-2); }
 .crit { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .crit .head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .crit .head b { font-size: 17px; }
