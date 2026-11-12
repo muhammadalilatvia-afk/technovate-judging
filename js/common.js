@@ -1,10 +1,10 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, EVENT } from "./config.js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, EVENT, FORCE_DEMO, UPLOAD } from "./config.js";
 import { demoBackend } from "./demo-backend.js";
 
-export { EVENT };
+export { EVENT, UPLOAD };
 
 export async function getApi() {
-  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && !FORCE_DEMO) {
     const { supabaseBackend } = await import("./supabase-backend.js");
     return supabaseBackend(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
@@ -119,6 +119,9 @@ export function teamsFromCsv(text) {
              members: names.join("; "), department: dept, round1: itb && !["1", "2", "4"].includes(year) };
   });
 }
+
+export const fmtSize = (b) => (b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB");
+export const fmtTime = (t) => (t ? new Date(t).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
 export function clock(el) {
   const tick = () => { el.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upload your presentation – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .drop { border: 2px dashed rgba(247,147,30,.6); border-radius: 16px; padding: 34px 20px; text-align: center; cursor: pointer; transition: .2s; background: rgba(247,147,30,.06); }
+  .drop.over { background: rgba(247,147,30,.18); }
+  .drop b { font-size: 18px; }
+  .bar { height: 12px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .bar div { height: 100%; width: 0; background: linear-gradient(90deg, var(--orange), var(--orange-2)); transition: width .2s; }
+  .file-ok { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 12px; background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.5); }
+  .file-ok .ico { font-size: 30px; }
+  ol.steps { padding-left: 20px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="40" height="40">
+    <span><b>AJOU TECHNOVATE</b><small>HACKATHON 3.0 · PRESENTATIONS</small></span></a>
+  <span class="spacer"></span>
+  <span id="mode"></span>
+  <img class="uni-logo" src="assets/ajou-logo.png" alt="Ajou University in Tashkent">
+</header>
+<main class="wrap" style="max-width:760px" id="app"></main>
+
+<script type="module">
+import { getApi, esc, toast, modeBadge, fmtSize, fmtTime, UPLOAD } from "./js/common.js";
+const api = await getApi();
+document.getElementById("mode").innerHTML = modeBadge(api);
+const app = document.getElementById("app");
+let code = sessionStorage.getItem("teamCode") || "", key = sessionStorage.getItem("teamKey") || "";
+
+function loginView(msg = "") {
+  app.innerHTML = `<section class="card stack" style="margin-top:30px">
+    <h2>Upload your team's presentation</h2>
+    <p class="muted">Upload the slides you will present on stage (PowerPoint or PDF, up to ${UPLOAD.maxMb} MB).
+      Deadline: <b>${esc(UPLOAD.deadline)}</b>. You can replace the file any time before the deadline.</p>
+    ${api.mode === "demo" ? `<p class="small"><span class="badge demo">DEMO</span> Team <b>T01</b>, upload code <b>100001</b></p>` : ""}
+    <form id="f" class="stack">
+      <div class="grid cols-2">
+        <label class="field"><span>Team code (e.g. T07)</span><input type="text" id="code" value="${esc(code)}" required autocomplete="off" style="text-transform:uppercase"></label>
+        <label class="field"><span>Upload code (6 digits, from the organizers)</span><input type="password" id="key" inputmode="numeric" required autocomplete="off"></label>
+      </div>
+      ${msg ? `<div class="toast err" style="position:static">${esc(msg)}</div>` : ""}
+      <button class="btn primary big" style="justify-content:center">Continue</button>
+    </form>
+    <p class="muted small">Don't have your codes? Ask the organizers in the <a href="https://t.me/AJOUH2025" target="_blank" rel="noopener">Telegram group</a>.</p>
+  </section>`;
+  document.getElementById("f").onsubmit = async (e) => {
+    e.preventDefault();
+    const c = document.getElementById("code").value.trim().toUpperCase(), k = document.getElementById("key").value.trim();
+    try {
+      const t = await api.teamCheck(c, k);
+      if (!t) return loginView("Team code or upload code is not correct.");
+      code = c; key = k; sessionStorage.setItem("teamCode", c); sessionStorage.setItem("teamKey", k);
+      teamView(t);
+    } catch (err) { loginView(err.message); }
+  };
+}
+
+function teamView(t) {
+  app.innerHTML = `<section class="card stack" style="margin-top:30px">
+    <div class="teamhero"><div class="code">TEAM ${esc(t.code)}</div><h2>${esc(t.project)}</h2><div class="muted">${esc(t.members)}</div></div>
+    ${t.file_name ? `<div class="file-ok"><div class="ico">✅</div><div><b>${esc(t.file_name)}</b>
+        <div class="muted small">${fmtSize(t.file_size)} · uploaded ${fmtTime(t.uploaded_at)}${t.uploads > 1 ? ` · version ${t.uploads}` : ""}</div></div></div>`
+      : `<div class="muted">No presentation uploaded yet.</div>`}
+    ${t.uploads_open ? `
+    <label class="drop" id="drop"><input type="file" id="file" accept="${UPLOAD.accept}" hidden>
+      <div style="font-size:40px">📤</div><b>${t.file_name ? "Replace your presentation" : "Choose your presentation"}</b>
+      <div class="muted small">Drag the file here or click · .pptx, .ppt or .pdf · max ${UPLOAD.maxMb} MB</div></label>
+    <div id="prog" class="hidden stack"><div class="row" style="justify-content:space-between"><span id="pname"></span><span id="ppct">0%</span></div><div class="bar"><div id="pbar"></div></div></div>`
+      : `<div class="toast err" style="position:static">Uploads are closed. Contact the organizers if you need to change your file.</div>`}
+    <ol class="steps small"><li>Name your file clearly, e.g. <i>${esc(t.code)}_${esc(t.project.replace(/[^\w]+/g, "_").slice(0, 24))}.pptx</i>.</li>
+      <li>Use 16:9 slides. Embed fonts and videos so they work on the hall computer.</li>
+      <li>Your pitch is short — keep it to about 6–8 slides.</li></ol>
+    <div class="row"><button class="btn" id="out">Use another team</button></div>
+  </section>`;
+  document.getElementById("out").onclick = () => { sessionStorage.removeItem("teamKey"); key = ""; loginView(); };
+  const input = document.getElementById("file"), drop = document.getElementById("drop");
+  if (!input) return;
+  input.onchange = () => input.files[0] && send(input.files[0], t);
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); e.dataTransfer.files[0] && send(e.dataTransfer.files[0], t); };
+}
+
+async function send(file, t) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (!["pptx", "ppt", "pdf"].includes(ext)) return toast("Please upload a .pptx, .ppt or .pdf file", "err");
+  if (file.size > UPLOAD.maxMb * 1048576) return toast(`File is larger than ${UPLOAD.maxMb} MB. Compress the images and try again.`, "err");
+  document.getElementById("drop").classList.add("hidden");
+  document.getElementById("prog").classList.remove("hidden");
+  document.getElementById("pname").textContent = `${file.name} (${fmtSize(file.size)})`;
+  try {
+    await api.uploadPresentation(code, key, file, (p) => {
+      document.getElementById("pbar").style.width = `${Math.round(p * 100)}%`;
+      document.getElementById("ppct").textContent = `${Math.round(p * 100)}%`;
+    });
+    toast("Presentation uploaded ✓");
+    teamView(await api.teamCheck(code, key));
+  } catch (err) {
+    toast(err.message, "err");
+    teamView(t);
+  }
+}
+
+if (code && key) { api.teamCheck(code, key).then((t) => (t ? teamView(t) : loginView())).catch(() => loginView()); }
+else loginView();
+</script>
+</body>
+</html>

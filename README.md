@@ -7,12 +7,18 @@ Open-source, free judging platform built for the **Ajou Technovate Hackathon 202
 - **Organizer panel** controls rounds, the team on stage, when scoring is open, and exports all results.
 - **Database** (Supabase, free tier) stores everything permanently; results can be downloaded as CSV/JSON and reused next year.
 
+- **Presentation portal**: each team uploads its PPT/PDF with its team code and private 6-digit upload code.
+- **Organizer dashboard**: teams, students, uploads, judging progress per round and judge, and a live activity feed.
+
 | Page | Who uses it |
 | --- | --- |
 | `index.html` | Home page with links |
+| `upload.html` | Teams upload their presentation |
 | `live.html` | Big screen in the hall |
 | `judge.html` | The 5 judges (personal PIN) |
-| `admin.html` | Organizers (organizer PIN) |
+| `admin.html` | Organizers (organizer PIN): dashboard, event control, presentations, teams, rounds, judges, results |
+
+Add `?demo` to any page URL to rehearse without touching the real database.
 
 No build step: plain HTML, CSS and JavaScript. Hosting on GitHub Pages is free.
 
@@ -32,6 +38,7 @@ Open <http://localhost:8080>. Demo PINs: organizer `0000`, judges `1111`, `2222`
 
 1. Create a free account at <https://supabase.com> and a **New project** (region: closest to Uzbekistan, e.g. Frankfurt).
 2. Open **SQL Editor → New query**, paste the whole of [`supabase/schema.sql`](supabase/schema.sql) and press **Run**.
+   Then do the same with [`supabase/002_presentations_dashboard.sql`](supabase/002_presentations_dashboard.sql) (presentation uploads + dashboard).
 3. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key into [`js/config.js`](js/config.js).
 4. Commit and push. Open `admin.html` — the first visit asks you to choose the organizer PIN.
 
@@ -48,7 +55,8 @@ The anon key is meant to be public. Reading is limited to teams, line-ups and ag
 1. **Teams tab** → upload the Google Form responses CSV (*File → Download → CSV*). Phone numbers, e-mails, Telegram usernames and student IDs are **not** imported. Duplicate submissions by the same leader are merged. Teams from IT Business (not 1st/2nd/4th year) are marked for Round 1 — adjust the checkboxes if needed.
 2. **Judges tab** → add the 5 judges with a personal PIN each (use *Generate random PIN*). Give each judge their PIN privately.
 3. **Rounds tab** → *Build line-up* for Round 1. Optionally shuffle the presentation order.
-4. Do a dry run: open `live.html` on the projector, `judge.html` on the judges' computers, `admin.html` on the organizer laptop.
+4. **Presentations tab** → *Team upload codes (CSV)* → send each team leader their team code + 6-digit upload code. Teams upload at `upload.html` (PPTX/PPT/PDF, max 50 MB, can replace until you press *Close uploads* on the dashboard). On stage, open the team's slides from the 📎 link in *Event control*.
+5. Do a dry run: open `live.html` on the projector, `judge.html` on the judges' computers, `admin.html` on the organizer laptop.
 
 ## 5. On the day
 

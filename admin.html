@@ -31,14 +31,14 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download } from "./js/common.js";
+import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime } from "./js/common.js";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
 const [rounds, criteria] = await Promise.all([api.getRounds(), api.getCriteria()]);
 const maxTotal = criteria.reduce((a, c) => a + c.max_points, 0);
 let pin = sessionStorage.getItem("adminPin");
-let tab = sessionStorage.getItem("adminTab") || "control";
+let tab = sessionStorage.getItem("adminTab") || "dashboard";
 let resultsRound = null;
 
 const run = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message, "err"); throw e; } };
@@ -75,22 +75,24 @@ async function load() {
     Promise.all(rounds.map((r) => api.getLeaderboard(r.id))),
     api.adminListJudges(pin),
   ]);
-  const progress = await api.getJudgeProgress();
-  return { st, teams, boards: Object.fromEntries(rounds.map((r, i) => [r.id, boards[i]])), judges, progress };
+  const [progress, pres, activity] = await Promise.all([api.getJudgeProgress(), api.adminPresentations(pin), api.adminActivity(pin, 30)]);
+  return { st, teams, boards: Object.fromEntries(rounds.map((r, i) => [r.id, boards[i]])), judges, progress, pres, activity };
 }
 
 // -------------------------------------------------------------- rendering --
 async function render() {
   const D = await load();
-  const tabs = [["control", "Event control"], ["teams", `Teams (${D.teams.length})`], ["rounds", "Rounds & line-ups"], ["judges", `Judges (${D.judges.filter((j) => j.active).length})`], ["results", "Results & export"]];
+  const up = D.pres.filter((p) => p.file_name).length;
+  const tabs = [["dashboard", "Dashboard"], ["control", "Event control"], ["presentations", `Presentations (${up}/${D.pres.length})`], ["teams", `Teams (${D.teams.length})`], ["rounds", "Rounds & line-ups"], ["judges", `Judges (${D.judges.filter((j) => j.active).length})`], ["results", "Results & export"]];
   app.innerHTML = `<div class="tabs noprint">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div><div id="pane"></div>`;
   app.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; sessionStorage.setItem("adminTab", tab); render(); });
   const pane = document.getElementById("pane");
-  ({ control, teams: teamsPane, rounds: roundsPane, judges: judgesPane, results })[tab](pane, D);
+  ({ dashboard, control, presentations: presentationsPane, teams: teamsPane, rounds: roundsPane, judges: judgesPane, results })[tab](pane, D);
 }
 
 // ---------------------------------------------------------- event control --
-function control(pane, { st, boards, progress }) {
+function control(pane, { st, boards, progress, pres }) {
+  const slides = Object.fromEntries(pres.filter((p) => p.file_path).map((p) => [p.team_id, p]));
   const round = rounds.find((r) => r.id === st.active_round);
   const lineup = [...boards[round.id]].sort((a, b) => a.position - b.position);
   const curIdx = lineup.findIndex((t) => t.team_id === st.current_team_id);
@@ -107,7 +109,8 @@ function control(pane, { st, boards, progress }) {
       ${lineup.length ? "" : `<p class="muted">No teams in ${esc(round.name)} yet. Build the line-up in <b>Rounds &amp; line-ups</b>.</p>`}
       <div class="lineup"><table><thead><tr><th>#</th><th>Team</th><th>Project</th><th class="num">Judges</th><th class="num">Score</th><th></th></tr></thead><tbody>
       ${lineup.map((t, i) => `<tr class="${t.team_id === st.current_team_id ? "current" : ""}">
-        <td>${i + 1}</td><td><b>${esc(t.code)}</b></td><td>${esc(t.project)}<div class="muted small">${esc(t.members)}</div></td>
+        <td>${i + 1}</td><td><b>${esc(t.code)}</b></td><td>${esc(t.project)}<div class="muted small">${esc(t.members)}</div>
+        ${slides[t.team_id] ? `<a class="small" href="${esc(api.fileUrl(slides[t.team_id].file_path))}" target="_blank" rel="noopener">📎 ${esc(slides[t.team_id].file_name)}</a>` : `<span class="small" style="color:#fca5a5">No slides uploaded</span>`}</td>
         <td class="num">${t.judges}/${progress.length}</td><td class="num">${t.judges ? fmt(t.score) : "–"}</td>
         <td>${t.team_id === st.current_team_id ? `<span class="badge orange">ON STAGE</span>` : `<button class="btn" data-stage="${t.team_id}">Put on stage</button>`}</td></tr>`).join("")}
       </tbody></table></div>
@@ -141,6 +144,80 @@ function control(pane, { st, boards, progress }) {
   document.getElementById("scoring").onclick = () => set({ scoring_open: !st.scoring_open });
   document.getElementById("show").onclick = () => set({ show_scores: !st.show_scores });
   document.getElementById("msgbtn").onclick = () => set({ message: document.getElementById("msg").value.trim() }, "Announcement updated");
+}
+
+// -------------------------------------------------------------- dashboard --
+function dashboard(pane, { st, teams, boards, judges, progress, pres, activity }) {
+  const round = rounds.find((r) => r.id === st.active_round);
+  const activeJudges = judges.filter((j) => j.active).length;
+  const students = teams.reduce((a, t) => a + (t.members ? t.members.split(";").filter((x) => x.trim()).length : 0), 0);
+  const uploaded = pres.filter((p) => p.file_name);
+  const cur = boards[round.id].find((t) => t.team_id === st.current_team_id);
+  const stat = (label, value, sub = "") => `<div class="card"><div class="muted small">${label}</div><div style="font-size:34px;font-weight:900">${value}</div><div class="muted small">${sub}</div></div>`;
+  const bar = (n, d) => `<div style="height:10px;border-radius:9px;background:rgba(255,255,255,.1);overflow:hidden"><div style="height:100%;width:${d ? Math.round(n / d * 100) : 0}%;background:linear-gradient(90deg,var(--orange),var(--orange-2))"></div></div>`;
+  const roundRows = rounds.map((r) => {
+    const b = boards[r.id], full = b.filter((t) => activeJudges && t.judges >= activeJudges).length, any = b.filter((t) => t.judges).length;
+    const top = rank(b).filter((x) => x.judges)[0];
+    return `<tr><td><b>${esc(r.name)}</b>${r.id === st.active_round ? ' <span class="badge orange">ACTIVE</span>' : ""}</td><td>${b.length}</td>
+      <td style="min-width:160px">${bar(full, b.length)}<div class="muted small">${full} fully scored · ${any} started</div></td>
+      <td>${top ? `${esc(top.code)} · ${fmt(top.score)}` : "–"}</td></tr>`;
+  }).join("");
+  const missing = pres.filter((p) => !p.file_name);
+  pane.innerHTML = `
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+      ${stat("Teams", teams.length, `${teams.filter((t) => t.round1).length} in Round 1 · ${teams.filter((t) => !t.round1).length} from Round 2`)}
+      ${stat("Students", students, "registered participants")}
+      ${stat("Presentations", `${uploaded.length}<span class="muted" style="font-size:20px">/${pres.length}</span>`, `${pres.length ? Math.round(uploaded.length / pres.length * 100) : 0}% uploaded`)}
+      ${stat("Judges", activeJudges, `${progress.filter((j) => j.scored_current).length} scored the team on stage`)}
+      ${stat("Now", esc(round.name), cur ? `On stage: ${esc(cur.code)} · scoring ${st.scoring_open ? "open" : "closed"}` : "No team on stage")}
+    </div>
+    <div class="grid cols-2" style="margin-top:18px">
+      <section class="card"><h2>Rounds</h2>
+        <table><thead><tr><th>Round</th><th>Teams</th><th>Progress</th><th>Leader</th></tr></thead><tbody>${roundRows}</tbody></table>
+        <h2 style="margin-top:18px">Judges · ${esc(round.name)}</h2>
+        <table><thead><tr><th>Judge</th><th>Scored</th><th>Progress</th></tr></thead><tbody>
+        ${progress.map((j) => `<tr><td>${esc(j.name)} ${j.scored_current ? "✅" : ""}</td><td>${j.scored}/${boards[round.id].length}</td><td style="min-width:140px">${bar(j.scored, boards[round.id].length)}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">No judges yet</td></tr>`}
+        </tbody></table>
+        <div class="row" style="margin-top:14px"><span class="badge ${st.uploads_open ? "ok" : "off"}">UPLOADS ${st.uploads_open ? "OPEN" : "CLOSED"}</span>
+          <button class="btn" id="tglUploads">${st.uploads_open ? "Close uploads" : "Re-open uploads"}</button>
+          <a class="btn" href="upload.html" target="_blank">Upload page ↗</a></div>
+      </section>
+      <section class="card"><h2>Recent activity</h2>
+        <div style="max-height:430px;overflow:auto">${activity.map((a) => `<div style="padding:7px 0;border-bottom:1px solid var(--line)">
+          <span class="badge ${a.kind === "upload" ? "ok" : "orange"}">${a.kind === "upload" ? "UPLOAD" : "SCORE"}</span>
+          <span class="muted small">${fmtTime(a.at)}</span><div class="small">${esc(a.detail)}</div></div>`).join("") || `<p class="muted">Nothing yet. Uploads and scores appear here live.</p>`}</div>
+      </section>
+    </div>
+    <section class="card" style="margin-top:18px"><h2>Missing presentations <span class="badge">${missing.length}</span></h2>
+      <div class="pill-list">${missing.map((p) => `<button title="${esc(p.project)}">${esc(p.code)}</button>`).join("") || `<span class="muted">All teams have uploaded 🎉</span>`}</div>
+    </section>`;
+  document.getElementById("tglUploads").onclick = () => run(() => api.adminSetState(pin, { uploads_open: !st.uploads_open }), "Saved").then(render);
+}
+
+// ---------------------------------------------------------- presentations --
+function presentationsPane(pane, { pres }) {
+  const done = pres.filter((p) => p.file_name).length;
+  pane.innerHTML = `<section class="card">
+    <div class="row" style="margin-bottom:12px"><h2 style="margin:0">Presentations · ${done}/${pres.length} uploaded</h2><span style="flex:1"></span>
+      <button class="btn" id="codes">⬇ Team upload codes (CSV)</button><button class="btn" id="links">⬇ File links (CSV)</button>
+      <button class="btn" id="showkeys">Show upload codes</button></div>
+    <p class="muted small">Send each team leader their team code and 6-digit upload code (for example in Telegram). Students upload on the <a href="upload.html" target="_blank">upload page</a>.
+      Files are stored in Supabase Storage; links are long and unguessable.</p>
+    <table><thead><tr><th>Team</th><th>Project</th><th>Upload code</th><th>File</th><th>Size</th><th>Uploaded</th></tr></thead><tbody>
+    ${pres.map((p) => `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.project)}<div class="muted small">${esc(p.members)}</div></td>
+      <td><code class="key" data-key="${esc(p.upload_key)}">••••••</code></td>
+      <td>${p.file_name ? `<a href="${esc(api.fileUrl(p.file_path))}" target="_blank" rel="noopener">📎 ${esc(p.file_name)}</a>${p.uploads > 1 ? ` <span class="muted small">v${p.uploads}</span>` : ""}` : `<span style="color:#fca5a5">Not uploaded</span>`}</td>
+      <td class="small">${p.file_size ? fmtSize(p.file_size) : ""}</td><td class="small">${fmtTime(p.uploaded_at)}</td></tr>`).join("")}
+    </tbody></table></section>`;
+  document.getElementById("showkeys").onclick = (e) => {
+    const show = e.target.textContent.startsWith("Show");
+    pane.querySelectorAll(".key").forEach((k) => { k.textContent = show ? k.dataset.key : "••••••"; });
+    e.target.textContent = show ? "Hide upload codes" : "Show upload codes";
+  };
+  document.getElementById("codes").onclick = () => download("team-upload-codes.csv", toCsv([["team_code", "project", "members", "upload_code", "upload_page"],
+    ...pres.map((p) => [p.code, p.project, p.members, p.upload_key, new URL("upload.html", location.href).href])]));
+  document.getElementById("links").onclick = () => download("presentation-links.csv", toCsv([["team_code", "project", "file_name", "url", "uploaded_at"],
+    ...pres.filter((p) => p.file_path).map((p) => [p.code, p.project, p.file_name, api.fileUrl(p.file_path), p.uploaded_at])]));
 }
 
 // ------------------------------------------------------------------ teams --
@@ -342,7 +419,7 @@ async function start() {
   lo.classList.remove("hidden");
   lo.onclick = () => { sessionStorage.removeItem("adminPin"); location.reload(); };
   // live refresh only on the control tab, and never while typing
-  api.subscribe(() => { if (tab === "control" && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) safeRender(); });
+  api.subscribe(() => { if (["control", "dashboard", "presentations"].includes(tab) && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) safeRender(); });
   safeRender();
 }
 pin && (await api.adminCheck(pin).catch(() => false)) ? start() : loginView();

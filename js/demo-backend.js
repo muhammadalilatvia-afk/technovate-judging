@@ -31,7 +31,8 @@ const SAMPLE = [
 
 function fresh() {
   return {
-    teams: SAMPLE.map(([code, project, members, department, round1], i) => ({ id: i + 1, code, project, members, department, round1 })),
+    teams: SAMPLE.map(([code, project, members, department, round1], i) => ({ id: i + 1, code, project, members, department, round1, upload_key: demoKey(i + 1) })),
+    presentations: [],
     round_teams: [],
     judges: [
       { id: 1, name: "Judge 1", pin: "1111", active: true },
@@ -39,13 +40,21 @@ function fresh() {
       { id: 3, name: "Judge 3", pin: "3333", active: true },
     ],
     scores: [],
-    state: { active_round: 1, current_team_id: null, scoring_open: false, show_scores: true, view: "board", message: "", version: 0 },
+    state: { active_round: 1, current_team_id: null, scoring_open: false, show_scores: true, uploads_open: true, view: "board", message: "", version: 0 },
     nextTeamId: SAMPLE.length + 1,
     nextJudgeId: 4,
   };
 }
+// Demo upload codes are predictable on purpose (T01 → 100001, T02 → 100002, …).
+const demoKey = (id) => String(100000 + id);
+const files = new Map(); // demo: uploaded files live only in this tab's memory
 function load() {
-  try { return JSON.parse(localStorage.getItem(KEY)) || fresh(); } catch { return fresh(); }
+  let db;
+  try { db = JSON.parse(localStorage.getItem(KEY)) || fresh(); } catch { db = fresh(); }
+  db.presentations ??= [];
+  db.state.uploads_open ??= true;
+  db.teams.forEach((t) => { t.upload_key ??= demoKey(t.id); });
+  return db;
 }
 function save(db) {
   db.state.version++;
@@ -163,4 +172,43 @@ export const demoBackend = {
   },
   adminResetRound(pin, round) { needAdmin(pin); const db = load(); const n = db.scores.length; db.scores = db.scores.filter((s) => s.round_id !== round); save(db); return delay(n - db.scores.length); },
   resetDemo() { localStorage.removeItem(KEY); save(load()); },
+
+  // presentations
+  teamCheck(code, key) {
+    const db = load(), t = db.teams.find((x) => x.code.toUpperCase() === code.trim().toUpperCase() && x.upload_key === key.trim());
+    if (!t) return delay(null);
+    const p = db.presentations.find((x) => x.team_id === t.id) || {};
+    return delay({ id: t.id, code: t.code, project: t.project, members: t.members, uploads_open: db.state.uploads_open,
+                   file_name: p.file_name, file_size: p.file_size, uploaded_at: p.uploaded_at, uploads: p.uploads || 0 });
+  },
+  fileUrl: (path) => files.get(path) || "#",
+  async uploadPresentation(code, key, file, onProgress) {
+    const db = load(), t = db.teams.find((x) => x.code.toUpperCase() === code.trim().toUpperCase() && x.upload_key === key.trim());
+    if (!t) throw new Error("Wrong team code or upload code");
+    if (!db.state.uploads_open) throw new Error("Uploads are closed by the organizer");
+    for (let i = 1; i <= 10; i++) { await new Promise((r) => setTimeout(r, 80)); onProgress?.(i / 10); }
+    const path = `${t.code}/${crypto.randomUUID()}/${file.name}`;
+    files.set(path, URL.createObjectURL(file));
+    const ex = db.presentations.find((x) => x.team_id === t.id);
+    const row = { team_id: t.id, file_path: path, file_name: file.name, file_size: file.size, uploaded_at: new Date().toISOString() };
+    if (ex) Object.assign(ex, row, { uploads: ex.uploads + 1 }); else db.presentations.push({ ...row, uploads: 1 });
+    save(db); return path;
+  },
+  adminPresentations(pin) {
+    needAdmin(pin); const db = load();
+    return delay(db.teams.slice().sort((a, b) => a.code.localeCompare(b.code)).map((t) => {
+      const p = db.presentations.find((x) => x.team_id === t.id) || {};
+      return { team_id: t.id, code: t.code, project: t.project, members: t.members, upload_key: t.upload_key,
+               file_path: p.file_path || null, file_name: p.file_name || null, file_size: p.file_size || null, uploads: p.uploads || 0, uploaded_at: p.uploaded_at || null };
+    }));
+  },
+  adminActivity(pin, limit = 25) {
+    needAdmin(pin); const db = load();
+    const team = (id) => db.teams.find((t) => t.id === id) || {};
+    const ev = [
+      ...db.scores.map((s) => ({ at: s.updated_at, kind: "score", detail: `${ROUNDS[s.round_id - 1].name} · ${(db.judges.find((j) => j.id === s.judge_id) || {}).name} scored ${team(s.team_id).code} (${team(s.team_id).project}): ${s.total}` })),
+      ...db.presentations.map((p) => ({ at: p.uploaded_at, kind: "upload", detail: `${team(p.team_id).code} (${team(p.team_id).project}) uploaded ${p.file_name}` })),
+    ];
+    return delay(ev.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, limit));
+  },
 };
