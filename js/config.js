@@ -13,7 +13,7 @@ export const FORCE_DEMO = new URLSearchParams(location.search).has("demo");
 export const UPLOAD = {
   maxMb: 50,
   accept: ".pptx,.ppt,.pdf",
-  deadline: "17 November 2026, 23:59",
+  deadline: "Monday, 16 November 2026, 23:59 (Tashkent time)",
 };
 
 export const EVENT = {

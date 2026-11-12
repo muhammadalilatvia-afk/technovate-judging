@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Upload your presentation – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261113a">
+<link rel="stylesheet" href="assets/app.css?v=20261113b">
 <style>
   .drop { border: 2px dashed rgba(247,147,30,.6); border-radius: 16px; padding: 34px 20px; text-align: center; cursor: pointer; transition: .2s; background: rgba(247,147,30,.06); }
   .drop.over { background: rgba(247,147,30,.18); }
@@ -28,7 +28,7 @@
 <main class="wrap" style="max-width:760px" id="app"></main>
 
 <script type="module">
-import { getApi, esc, toast, modeBadge, fmtSize, fmtTime, UPLOAD, compressImage } from "./js/common.js?v=20261113a";
+import { getApi, esc, toast, modeBadge, fmtSize, fmtTime, UPLOAD, compressImage } from "./js/common.js?v=20261113b";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
