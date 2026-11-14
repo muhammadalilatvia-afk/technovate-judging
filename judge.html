@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Judge – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261113b">
+<link rel="stylesheet" href="assets/app.css?v=20261113c">
 </head>
 <body>
 <header class="topbar">
@@ -20,8 +20,8 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, toast, modeBadge, avatar } from "./js/common.js?v=20261113b";
-import { QUESTIONS, FOLLOW_UPS } from "./js/questions.js?v=20261113b";
+import { getApi, esc, fmt, toast, modeBadge, avatar } from "./js/common.js?v=20261113c";
+import { QUESTIONS, FOLLOW_UPS } from "./js/questions.js?v=20261113c";
 // Question helper state: which question is highlighted, and which were already asked per team (this browser only).
 let qPick = null, qTeam = null;
 const asked = (() => { try { return JSON.parse(sessionStorage.getItem("askedQ") || "{}"); } catch { return {}; } })();

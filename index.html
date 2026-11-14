@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ajou Technovate Hackathon 3.0 – Judging</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261113b">
+<link rel="stylesheet" href="assets/app.css?v=20261113c">
 <style>
   .hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 30px; align-items: center; padding: 40px 0 10px; }
   .hero h1 { font-size: clamp(36px, 5vw, 64px); font-weight: 900; letter-spacing: -1px; }
@@ -70,7 +70,7 @@
   <p class="muted small" style="text-align:center;margin-top:30px">Ajou University in Tashkent · Open-source judging system · <a href="https://t.me/AJOUH2025">Telegram</a></p>
 </main>
 <script type="module">
-  import { getApi, modeBadge } from "./js/common.js?v=20261113b";
+  import { getApi, modeBadge } from "./js/common.js?v=20261113c";
   const api = await getApi();
   document.getElementById("mode").innerHTML = modeBadge(api) || '<span class="badge ok">LIVE DATABASE</span>';
 </script>

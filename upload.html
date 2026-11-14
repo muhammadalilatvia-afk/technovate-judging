@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Upload your presentation – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261113b">
+<link rel="stylesheet" href="assets/app.css?v=20261113c">
 <style>
   .drop { border: 2px dashed rgba(247,147,30,.6); border-radius: 16px; padding: 34px 20px; text-align: center; cursor: pointer; transition: .2s; background: rgba(247,147,30,.06); }
   .drop.over { background: rgba(247,147,30,.18); }
@@ -15,6 +15,7 @@
   .file-ok { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 12px; background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.5); }
   .file-ok .ico { font-size: 30px; }
   ol.steps { padding-left: 20px; color: var(--muted); }
+  .pick-card { border: 1px solid rgba(247,147,30,.6); background: rgba(247,147,30,.08); border-radius: 14px; padding: 16px; }
 </style>
 </head>
 <body>
@@ -28,7 +29,7 @@
 <main class="wrap" style="max-width:760px" id="app"></main>
 
 <script type="module">
-import { getApi, esc, toast, modeBadge, fmtSize, fmtTime, UPLOAD, compressImage } from "./js/common.js?v=20261113b";
+import { getApi, esc, toast, modeBadge, fmtSize, fmtTime, UPLOAD, compressImage } from "./js/common.js?v=20261113c";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -69,10 +70,18 @@ function teamView(t) {
         <div class="muted small">${fmtSize(t.file_size)} · uploaded ${fmtTime(t.uploaded_at)}${t.uploads > 1 ? ` · version ${t.uploads}` : ""}</div></div></div>`
       : `<div class="muted">No presentation uploaded yet.</div>`}
     ${t.uploads_open ? `
-    <label class="drop" id="drop"><input type="file" id="file" accept="${UPLOAD.accept}" hidden>
-      <div style="font-size:40px">📤</div><b>${t.file_name ? "Replace your presentation" : "Choose your presentation"}</b>
-      <div class="muted small">Drag the file here or click · .pptx, .ppt or .pdf · max ${UPLOAD.maxMb} MB</div></label>
-    <div id="prog" class="hidden stack"><div class="row" style="justify-content:space-between"><span id="pname"></span><span id="ppct">0%</span></div><div class="bar"><div id="pbar"></div></div></div>`
+    <label class="drop" id="drop"><input type="file" id="file" accept="${UPLOAD.accept},application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint,application/pdf" hidden>
+      <div style="font-size:40px">📤</div><b>Step 1 · ${t.file_name ? "Choose a new file to replace it" : "Choose your presentation file"}</b>
+      <div class="muted small">Click here or drag the file · .pptx, .ppt or .pdf · max ${UPLOAD.maxMb} MB</div></label>
+    <div id="picked" class="hidden pick-card">
+      <div class="row" style="gap:14px;flex-wrap:nowrap"><div style="font-size:36px">📄</div>
+        <div style="min-width:0;flex:1"><b id="pfile" style="word-break:break-all"></b><div class="muted small" id="pinfo"></div></div></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary big" id="doUpload">⬆ Step 2 · Upload presentation</button>
+        <button class="btn" id="repick">Choose another file</button></div>
+    </div>
+    <div id="perr" class="toast err hidden" style="position:static"></div>
+    <div id="prog" class="hidden stack"><div class="row" style="justify-content:space-between"><span id="pname"></span><span id="ppct">0%</span></div><div class="bar"><div id="pbar"></div></div>
+      <div class="muted small">Uploading… keep this page open.</div></div>`
       : `<div class="toast err" style="position:static">Uploads are closed. Contact the organizers if you need to change your file.</div>`}
     <h2 style="margin-top:22px">📸 Team photo</h2>
     <p class="muted small" style="margin-top:-6px">One photo of your whole team — alone if you are an individual, or all 2–3 members together.
@@ -81,8 +90,11 @@ function teamView(t) {
       ${t.photo_path && api.photoUrl(t.photo_path) ? `<img src="${esc(api.photoUrl(t.photo_path))}" alt="Team photo" style="width:150px;height:150px;object-fit:cover;border-radius:16px;border:2px solid var(--orange)">`
         : `<div style="width:150px;height:150px;border-radius:16px;border:2px dashed rgba(247,147,30,.6);display:flex;align-items:center;justify-content:center;font-size:44px">👥</div>`}
       <div class="stack" style="flex:1">
-        ${t.uploads_open ? `<label class="btn primary" style="width:fit-content;cursor:pointer">${t.photo_path ? "Replace photo" : "Choose team photo"}
-            <input type="file" id="photo" accept="image/jpeg,image/png,image/webp" hidden></label>
+        ${t.uploads_open ? `<label class="btn" style="width:fit-content;cursor:pointer" id="phlabel">📷 ${t.photo_path ? "Choose a new photo" : "Choose team photo"}
+            <input type="file" id="photo" accept="image/*" hidden></label>
+          <div id="phpicked" class="hidden row"><img id="phpreview" alt="" style="width:90px;height:90px;object-fit:cover;border-radius:12px">
+            <button class="btn primary" id="doPhoto">⬆ Upload photo</button><button class="btn" id="phcancel">Cancel</button></div>
+          <div id="pherr" class="toast err hidden" style="position:static"></div>
           <div id="phprog" class="hidden"><div class="bar"><div id="phbar"></div></div></div>` : ""}
         <div class="muted small">JPG or PNG. Faces clearly visible, good light, landscape or square works best. We resize it automatically.</div>
         ${t.photo_path ? `<div class="small" style="color:#86efac">✓ Photo uploaded ${fmtTime(t.photo_at)}</div>` : ""}
@@ -95,44 +107,77 @@ function teamView(t) {
     <div class="row"><button class="btn" id="out">Use another team</button></div>
   </section>`;
   document.getElementById("out").onclick = () => { sessionStorage.removeItem("teamKey"); key = ""; loginView(); };
-  const photo = document.getElementById("photo");
-  if (photo) photo.onchange = async () => {
-    const f = photo.files[0]; if (!f) return;
-    if (!/^image\//.test(f.type)) return toast("Please choose a JPG or PNG photo", "err");
-    if (f.size > 25 * 1048576) return toast("This photo is very large. Please choose one under 25 MB.", "err");
-    document.getElementById("phprog").classList.remove("hidden");
+  const $ = (id) => document.getElementById(id);
+  const showErr = (id, msg) => { const el = $(id); if (!el) return; el.textContent = msg ? "⚠ " + msg : ""; el.classList.toggle("hidden", !msg); };
+
+  // ---- team photo: choose → preview → Upload photo
+  const photo = $("photo");
+  let photoFile = null;
+  if (photo) photo.onchange = () => {
+    const f = photo.files[0]; photo.value = ""; showErr("pherr", "");
+    if (!f) return;
+    const okExt = /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name) || /^image\//.test(f.type);
+    if (!okExt) return showErr("pherr", "Please choose a photo (JPG or PNG).");
+    if (f.size > 25 * 1048576) return showErr("pherr", "This photo is very large. Please choose one under 25 MB.");
+    photoFile = f;
+    $("phpreview").src = URL.createObjectURL(f);
+    $("phpicked").classList.remove("hidden"); $("phlabel").classList.add("hidden");
+  };
+  if ($("phcancel")) $("phcancel").onclick = () => { photoFile = null; $("phpicked").classList.add("hidden"); $("phlabel").classList.remove("hidden"); };
+  if ($("doPhoto")) $("doPhoto").onclick = async () => {
+    if (!photoFile) return;
+    $("doPhoto").disabled = true; $("phprog").classList.remove("hidden"); showErr("pherr", "");
     try {
-      const blob = await compressImage(f);
-      await api.uploadPhoto(code, key, blob, (p) => { document.getElementById("phbar").style.width = `${Math.round(p * 100)}%`; });
+      const blob = await compressImage(photoFile);
+      await api.uploadPhoto(code, key, blob, (p) => { $("phbar").style.width = `${Math.round(p * 100)}%`; });
       toast("Team photo uploaded ✓");
       teamView(await api.teamCheck(code, key));
-    } catch (err) { toast(err.message, "err"); teamView(t); }
+    } catch (err) {
+      const msg = /supported image/i.test(err.message) ? "This photo format can't be read (for example iPhone HEIC). Please send it as JPG or take a screenshot of it, then upload again." : err.message;
+      $("doPhoto").disabled = false; $("phprog").classList.add("hidden"); showErr("pherr", msg);
+    }
   };
-  const input = document.getElementById("file"), drop = document.getElementById("drop");
+
+  // ---- presentation: choose → check → Upload presentation
+  const input = $("file"), drop = $("drop");
   if (!input) return;
-  input.onchange = () => input.files[0] && send(input.files[0], t);
+  let chosen = null;
+  const pick = (file) => {
+    showErr("perr", "");
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!["pptx", "ppt", "pdf"].includes(ext)) return showErr("perr", `"${file.name}" is not a presentation. Please choose a .pptx, .ppt or .pdf file.`);
+    if (file.size > UPLOAD.maxMb * 1048576) return showErr("perr", `This file is ${fmtSize(file.size)}. The limit is ${UPLOAD.maxMb} MB — compress the images (PowerPoint: File → Compress Pictures) or save as PDF, then try again.`);
+    if (file.size === 0) return showErr("perr", "This file is empty. Please choose the correct file.");
+    chosen = file;
+    $("pfile").textContent = file.name;
+    $("pinfo").textContent = `${fmtSize(file.size)} · ready to upload`;
+    drop.classList.add("hidden"); $("picked").classList.remove("hidden");
+  };
+  input.onchange = () => { pick(input.files[0]); input.value = ""; };
   drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
   drop.ondragleave = () => drop.classList.remove("over");
-  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); e.dataTransfer.files[0] && send(e.dataTransfer.files[0], t); };
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); pick(e.dataTransfer.files[0]); };
+  $("repick").onclick = () => { chosen = null; $("picked").classList.add("hidden"); drop.classList.remove("hidden"); input.click(); };
+  $("doUpload").onclick = () => chosen && send(chosen, t);
 }
 
 async function send(file, t) {
-  const ext = file.name.split(".").pop().toLowerCase();
-  if (!["pptx", "ppt", "pdf"].includes(ext)) return toast("Please upload a .pptx, .ppt or .pdf file", "err");
-  if (file.size > UPLOAD.maxMb * 1048576) return toast(`File is larger than ${UPLOAD.maxMb} MB. Compress the images and try again.`, "err");
-  document.getElementById("drop").classList.add("hidden");
-  document.getElementById("prog").classList.remove("hidden");
-  document.getElementById("pname").textContent = `${file.name} (${fmtSize(file.size)})`;
+  const $ = (id) => document.getElementById(id);
+  $("picked").classList.add("hidden");
+  $("prog").classList.remove("hidden");
+  $("pname").textContent = `${file.name} (${fmtSize(file.size)})`;
   try {
     await api.uploadPresentation(code, key, file, (p) => {
-      document.getElementById("pbar").style.width = `${Math.round(p * 100)}%`;
-      document.getElementById("ppct").textContent = `${Math.round(p * 100)}%`;
+      $("pbar").style.width = `${Math.round(p * 100)}%`;
+      $("ppct").textContent = `${Math.round(p * 100)}%`;
     });
     toast("Presentation uploaded ✓");
     teamView(await api.teamCheck(code, key));
   } catch (err) {
-    toast(err.message, "err");
-    teamView(t);
+    $("prog").classList.add("hidden");
+    $("picked").classList.remove("hidden");
+    const el = $("perr"); el.textContent = "⚠ " + (/network/i.test(err.message) ? "The connection dropped during upload. Check the internet and press Upload again." : err.message); el.classList.remove("hidden");
   }
 }
 

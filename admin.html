@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Organizer – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261113b">
+<link rel="stylesheet" href="assets/app.css?v=20261113c">
 <style>
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
   .tabs button { border: 1px solid var(--line); background: rgba(255,255,255,.05); padding: 9px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; }
@@ -31,7 +31,7 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261113b";
+import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261113c";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -40,6 +40,7 @@ const maxTotal = criteria.reduce((a, c) => a + c.max_points, 0);
 let pin = sessionStorage.getItem("adminPin");
 let tab = sessionStorage.getItem("adminTab") || "dashboard";
 let resultsRound = null;
+let showKeys = false;   // upload codes stay visible until "Hide" is clicked (survives auto-refresh)
 
 const run = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message, "err"); throw e; } };
 
@@ -85,7 +86,7 @@ async function render() {
   const up = D.pres.filter((p) => p.file_name).length;
   const tabs = [["dashboard", "Dashboard"], ["control", "Event control"], ["presentations", `Presentations (${up}/${D.pres.length})`], ["teams", `Teams (${D.teams.length})`], ["rounds", "Rounds & line-ups"], ["judges", `Judges (${D.judges.filter((j) => j.active).length})`], ["results", "Results & export"]];
   app.innerHTML = `<div class="tabs noprint">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div><div id="pane"></div>`;
-  app.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; sessionStorage.setItem("adminTab", tab); render(); });
+  app.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { showKeys = false; tab = b.dataset.tab; sessionStorage.setItem("adminTab", tab); render(); });
   const pane = document.getElementById("pane");
   ({ dashboard, control, presentations: presentationsPane, teams: teamsPane, rounds: roundsPane, judges: judgesPane, results })[tab](pane, D);
 }
@@ -237,20 +238,16 @@ function presentationsPane(pane, { pres }) {
   pane.innerHTML = `<section class="card">
     <div class="row" style="margin-bottom:12px"><h2 style="margin:0">Presentations · ${done}/${pres.length} uploaded · 📸 ${photos}/${pres.length} photos</h2><span style="flex:1"></span>
       <button class="btn" id="codes">⬇ Team upload codes (CSV)</button><button class="btn" id="links">⬇ File links (CSV)</button>
-      <button class="btn" id="showkeys">Show upload codes</button></div>
+      <button class="btn ${showKeys ? "primary" : ""}" id="showkeys">${showKeys ? "🙈 Hide upload codes" : "👁 Show upload codes"}</button></div>
     <p class="muted small">Send each team leader their team code and 6-digit upload code (for example in Telegram). Students upload on the <a href="upload.html" target="_blank">upload page</a>.
       Files are stored in Supabase Storage; links are long and unguessable.</p>
     <table><thead><tr><th>Photo</th><th>Team</th><th>Project</th><th>Upload code</th><th>File</th><th>Size</th><th>Uploaded</th></tr></thead><tbody>
     ${pres.map((p) => `<tr><td>${p.photo_path ? `<a href="${esc(api.photoUrl(p.photo_path))}" target="_blank" rel="noopener">${avatar(api, p, 52, "sq")}</a><div><button class="btn danger small" data-clearphoto="${p.team_id}" style="padding:2px 8px;margin-top:4px">Remove</button></div>` : `<span class="muted small">No photo</span>`}</td><td><b>${esc(p.code)}</b></td><td>${esc(p.project)}<div class="muted small">${esc(p.members)}</div></td>
-      <td><code class="key" data-key="${esc(p.upload_key)}">••••••</code></td>
+      <td><code class="key" style="font-size:15px;letter-spacing:1px">${showKeys ? esc(p.upload_key) : "••••••"}</code></td>
       <td>${p.file_name ? `<a href="${esc(api.fileUrl(p.file_path))}" target="_blank" rel="noopener">📎 ${esc(p.file_name)}</a>${p.uploads > 1 ? ` <span class="muted small">v${p.uploads}</span>` : ""}` : `<span style="color:#fca5a5">Not uploaded</span>`}</td>
       <td class="small">${p.file_size ? fmtSize(p.file_size) : ""}</td><td class="small">${fmtTime(p.uploaded_at)}</td></tr>`).join("")}
     </tbody></table></section>`;
-  document.getElementById("showkeys").onclick = (e) => {
-    const show = e.target.textContent.startsWith("Show");
-    pane.querySelectorAll(".key").forEach((k) => { k.textContent = show ? k.dataset.key : "••••••"; });
-    e.target.textContent = show ? "Hide upload codes" : "Show upload codes";
-  };
+  document.getElementById("showkeys").onclick = () => { showKeys = !showKeys; render(); };
   pane.querySelectorAll("[data-clearphoto]").forEach((b) => b.onclick = async () => {
     if (!confirm("Remove this team photo? The team can upload a new one.")) return;
     await run(() => api.adminClearPhoto(pin, Number(b.dataset.clearphoto)), "Photo removed"); render();

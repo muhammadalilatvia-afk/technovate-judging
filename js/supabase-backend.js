@@ -64,7 +64,10 @@ export function supabaseBackend(url, key) {
       const team = await checkTeam(code, key);
       const safe = file.name.normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-90);
       const path = `${team.code}/${crypto.randomUUID()}/${safe}`;
-      const type = file.type || ({ pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", ppt: "application/vnd.ms-powerpoint", pdf: "application/pdf" })[file.name.split(".").pop().toLowerCase()];
+      // Always decide the type from the extension: many phones and PCs without PowerPoint report
+      // .pptx as "application/octet-stream", which the storage server would refuse.
+      const type = ({ pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", ppt: "application/vnd.ms-powerpoint", pdf: "application/pdf" })[file.name.split(".").pop().toLowerCase()];
+      if (!type) throw new Error("Please upload a .pptx, .ppt or .pdf file");
       await putObject("presentations", path, file, type, onProgress);
       await rpc("register_presentation", { p_code: team.code, p_key: key, p_path: path, p_name: file.name, p_size: file.size });
       return path;
