@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Upload your presentation – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261113c">
+<link rel="stylesheet" href="assets/app.css?v=20261115a">
 <style>
-  .drop { border: 2px dashed rgba(247,147,30,.6); border-radius: 16px; padding: 34px 20px; text-align: center; cursor: pointer; transition: .2s; background: rgba(247,147,30,.06); }
+  .drop { display: block; border: 2px dashed rgba(247,147,30,.6); border-radius: 16px; padding: 34px 20px; text-align: center; cursor: pointer; transition: .2s; background: rgba(247,147,30,.06); }
   .drop.over { background: rgba(247,147,30,.18); }
   .drop b { font-size: 18px; }
   .bar { height: 12px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
@@ -15,6 +15,10 @@
   .file-ok { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 12px; background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.5); }
   .file-ok .ico { font-size: 30px; }
   ol.steps { padding-left: 20px; color: var(--muted); }
+  .step-h { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .step-h h2 { margin: 0; }
+  .step-h .num { width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--orange); color: #1a1205; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+  .submit-box { margin-top: 16px; padding-top: 18px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
   .pick-card { border: 1px solid rgba(247,147,30,.6); background: rgba(247,147,30,.08); border-radius: 14px; padding: 16px; }
 </style>
 </head>
@@ -29,7 +33,7 @@
 <main class="wrap" style="max-width:760px" id="app"></main>
 
 <script type="module">
-import { getApi, esc, toast, modeBadge, fmtSize, fmtTime, UPLOAD, compressImage } from "./js/common.js?v=20261113c";
+import { getApi, esc, toast, modeBadge, fmtSize, fmtTime, UPLOAD, compressImage } from "./js/common.js?v=20261115a";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -64,36 +68,37 @@ function loginView(msg = "") {
 }
 
 function teamView(t) {
+  const hasPhoto = t.photo_path && api.photoUrl(t.photo_path);
   app.innerHTML = `<section class="card stack" style="margin-top:30px">
     <div class="teamhero"><div class="code">TEAM ${esc(t.code)}</div><h2>${esc(t.project)}</h2><div class="muted">${esc(t.members)}</div></div>
-    ${t.file_name ? `<div class="file-ok"><div class="ico">✅</div><div><b>${esc(t.file_name)}</b>
+    ${!t.uploads_open ? `<div class="toast err" style="position:static">Uploads are closed. Contact the organizers if you need to change your file or photo.</div>` : ""}
+
+    <div class="step-h"><span class="num">1</span><h2>Presentation</h2></div>
+    ${t.file_name ? `<div class="file-ok"><div class="ico">✅</div><div style="min-width:0"><b style="word-break:break-all">${esc(t.file_name)}</b>
         <div class="muted small">${fmtSize(t.file_size)} · uploaded ${fmtTime(t.uploaded_at)}${t.uploads > 1 ? ` · version ${t.uploads}` : ""}</div></div></div>`
-      : `<div class="muted">No presentation uploaded yet.</div>`}
+      : `<div class="muted small">No presentation uploaded yet.</div>`}
     ${t.uploads_open ? `
     <label class="drop" id="drop"><input type="file" id="file" accept="${UPLOAD.accept},application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint,application/pdf" hidden>
-      <div style="font-size:40px">📤</div><b>Step 1 · ${t.file_name ? "Choose a new file to replace it" : "Choose your presentation file"}</b>
+      <div style="font-size:38px">📤</div><b>${t.file_name ? "Choose a new file to replace it" : "Choose your presentation file"}</b>
       <div class="muted small">Click here or drag the file · .pptx, .ppt or .pdf · max ${UPLOAD.maxMb} MB</div></label>
     <div id="picked" class="hidden pick-card">
       <div class="row" style="gap:14px;flex-wrap:nowrap"><div style="font-size:36px">📄</div>
-        <div style="min-width:0;flex:1"><b id="pfile" style="word-break:break-all"></b><div class="muted small" id="pinfo"></div></div></div>
-      <div class="row" style="margin-top:12px"><button class="btn primary big" id="doUpload">⬆ Step 2 · Upload presentation</button>
-        <button class="btn" id="repick">Choose another file</button></div>
+        <div style="min-width:0;flex:1"><b id="pfile" style="word-break:break-all"></b><div class="muted small" id="pinfo"></div></div>
+        <button class="btn" id="repick" type="button">Change</button></div>
+      <div id="prog" class="hidden stack" style="margin-top:12px"><div class="row" style="justify-content:space-between"><span class="small">Uploading presentation…</span><span id="ppct" class="small">0%</span></div><div class="bar"><div id="pbar"></div></div></div>
     </div>
-    <div id="perr" class="toast err hidden" style="position:static"></div>
-    <div id="prog" class="hidden stack"><div class="row" style="justify-content:space-between"><span id="pname"></span><span id="ppct">0%</span></div><div class="bar"><div id="pbar"></div></div>
-      <div class="muted small">Uploading… keep this page open.</div></div>`
-      : `<div class="toast err" style="position:static">Uploads are closed. Contact the organizers if you need to change your file.</div>`}
-    <h2 style="margin-top:22px">📸 Team photo</h2>
-    <p class="muted small" style="margin-top:-6px">One photo of your whole team — alone if you are an individual, or all 2–3 members together.
+    <div id="perr" class="toast err hidden" style="position:static"></div>` : ""}
+
+    <div class="step-h"><span class="num">2</span><h2>📸 Team photo</h2></div>
+    <p class="muted small" style="margin:0">One photo of your whole team — alone if you are an individual, or all 2–3 members together.
       It appears on the big screen with your project title, on the judges' screens and next to your score.</p>
     <div class="photo-drop">
-      ${t.photo_path && api.photoUrl(t.photo_path) ? `<img src="${esc(api.photoUrl(t.photo_path))}" alt="Team photo" style="width:150px;height:150px;object-fit:cover;border-radius:16px;border:2px solid var(--orange)">`
-        : `<div style="width:150px;height:150px;border-radius:16px;border:2px dashed rgba(247,147,30,.6);display:flex;align-items:center;justify-content:center;font-size:44px">👥</div>`}
-      <div class="stack" style="flex:1">
-        ${t.uploads_open ? `<label class="btn" style="width:fit-content;cursor:pointer" id="phlabel">📷 ${t.photo_path ? "Choose a new photo" : "Choose team photo"}
+      <img id="phpreview" alt="Team photo" src="${hasPhoto ? esc(api.photoUrl(t.photo_path)) : ""}" class="${hasPhoto ? "" : "hidden"}" style="width:150px;height:150px;object-fit:cover;border-radius:16px;border:2px solid var(--orange);flex:none">
+      <div id="phempty" class="${hasPhoto ? "hidden" : ""}" style="width:150px;height:150px;flex:none;border-radius:16px;border:2px dashed rgba(247,147,30,.6);display:flex;align-items:center;justify-content:center;font-size:44px">👥</div>
+      <div class="stack" style="flex:1;min-width:0">
+        ${t.uploads_open ? `<label class="btn" style="width:fit-content;cursor:pointer">📷 ${t.photo_path ? "Choose a new photo" : "Choose team photo"}
             <input type="file" id="photo" accept="image/*" hidden></label>
-          <div id="phpicked" class="hidden row"><img id="phpreview" alt="" style="width:90px;height:90px;object-fit:cover;border-radius:12px">
-            <button class="btn primary" id="doPhoto">⬆ Upload photo</button><button class="btn" id="phcancel">Cancel</button></div>
+          <div id="phpicked" class="hidden small" style="color:var(--orange)"></div>
           <div id="pherr" class="toast err hidden" style="position:static"></div>
           <div id="phprog" class="hidden"><div class="bar"><div id="phbar"></div></div></div>` : ""}
         <div class="muted small">JPG or PNG. Faces clearly visible, good light, landscape or square works best. We resize it automatically.</div>
@@ -101,47 +106,29 @@ function teamView(t) {
       </div>
     </div>
 
-    <ol class="steps small" style="margin-top:18px"><li>Name your file clearly, e.g. <i>${esc(t.code)}_${esc(t.project.replace(/[^\w]+/g, "_").slice(0, 24))}.pptx</i>.</li>
+    ${t.uploads_open ? `<div class="submit-box">
+      <div class="muted small" id="sumtext">Choose your presentation and/or team photo above, then press Submit.</div>
+      <button class="btn primary big" id="submit" disabled style="justify-content:center;width:100%">✅ Submit</button>
+    </div>` : ""}
+
+    <ol class="steps small" style="margin-top:6px"><li>Name your file clearly, e.g. <i>${esc(t.code)}_${esc(t.project.replace(/[^\w]+/g, "_").slice(0, 24))}.pptx</i>.</li>
       <li>Use 16:9 slides. Embed fonts and videos so they work on the hall computer.</li>
       <li>Your pitch is short — keep it to about 6–8 slides.</li></ol>
     <div class="row"><button class="btn" id="out">Use another team</button></div>
   </section>`;
-  document.getElementById("out").onclick = () => { sessionStorage.removeItem("teamKey"); key = ""; loginView(); };
   const $ = (id) => document.getElementById(id);
+  $("out").onclick = () => { sessionStorage.removeItem("teamKey"); key = ""; loginView(); };
+  if (!t.uploads_open) return;
   const showErr = (id, msg) => { const el = $(id); if (!el) return; el.textContent = msg ? "⚠ " + msg : ""; el.classList.toggle("hidden", !msg); };
-
-  // ---- team photo: choose → preview → Upload photo
-  const photo = $("photo");
-  let photoFile = null;
-  if (photo) photo.onchange = () => {
-    const f = photo.files[0]; photo.value = ""; showErr("pherr", "");
-    if (!f) return;
-    const okExt = /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name) || /^image\//.test(f.type);
-    if (!okExt) return showErr("pherr", "Please choose a photo (JPG or PNG).");
-    if (f.size > 25 * 1048576) return showErr("pherr", "This photo is very large. Please choose one under 25 MB.");
-    photoFile = f;
-    $("phpreview").src = URL.createObjectURL(f);
-    $("phpicked").classList.remove("hidden"); $("phlabel").classList.add("hidden");
-  };
-  if ($("phcancel")) $("phcancel").onclick = () => { photoFile = null; $("phpicked").classList.add("hidden"); $("phlabel").classList.remove("hidden"); };
-  if ($("doPhoto")) $("doPhoto").onclick = async () => {
-    if (!photoFile) return;
-    $("doPhoto").disabled = true; $("phprog").classList.remove("hidden"); showErr("pherr", "");
-    try {
-      const blob = await compressImage(photoFile);
-      await api.uploadPhoto(code, key, blob, (p) => { $("phbar").style.width = `${Math.round(p * 100)}%`; });
-      toast("Team photo uploaded ✓");
-      teamView(await api.teamCheck(code, key));
-    } catch (err) {
-      const msg = /supported image/i.test(err.message) ? "This photo format can't be read (for example iPhone HEIC). Please send it as JPG or take a screenshot of it, then upload again." : err.message;
-      $("doPhoto").disabled = false; $("phprog").classList.add("hidden"); showErr("pherr", msg);
-    }
+  let chosen = null, photoFile = null;
+  const refresh = () => {
+    const parts = [chosen && "presentation", photoFile && "team photo"].filter(Boolean);
+    $("submit").disabled = !parts.length;
+    $("sumtext").textContent = parts.length ? `Ready to submit: ${parts.join(" + ")}.` : "Choose your presentation and/or team photo above, then press Submit.";
   };
 
-  // ---- presentation: choose → check → Upload presentation
+  // ---- presentation
   const input = $("file"), drop = $("drop");
-  if (!input) return;
-  let chosen = null;
   const pick = (file) => {
     showErr("perr", "");
     if (!file) return;
@@ -151,34 +138,63 @@ function teamView(t) {
     if (file.size === 0) return showErr("perr", "This file is empty. Please choose the correct file.");
     chosen = file;
     $("pfile").textContent = file.name;
-    $("pinfo").textContent = `${fmtSize(file.size)} · ready to upload`;
+    $("pinfo").textContent = `${fmtSize(file.size)} · will be uploaded when you press Submit`;
     drop.classList.add("hidden"); $("picked").classList.remove("hidden");
+    refresh();
   };
   input.onchange = () => { pick(input.files[0]); input.value = ""; };
   drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
   drop.ondragleave = () => drop.classList.remove("over");
   drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); pick(e.dataTransfer.files[0]); };
-  $("repick").onclick = () => { chosen = null; $("picked").classList.add("hidden"); drop.classList.remove("hidden"); input.click(); };
-  $("doUpload").onclick = () => chosen && send(chosen, t);
-}
+  $("repick").onclick = () => input.click();
 
-async function send(file, t) {
-  const $ = (id) => document.getElementById(id);
-  $("picked").classList.add("hidden");
-  $("prog").classList.remove("hidden");
-  $("pname").textContent = `${file.name} (${fmtSize(file.size)})`;
-  try {
-    await api.uploadPresentation(code, key, file, (p) => {
-      $("pbar").style.width = `${Math.round(p * 100)}%`;
-      $("ppct").textContent = `${Math.round(p * 100)}%`;
-    });
-    toast("Presentation uploaded ✓");
-    teamView(await api.teamCheck(code, key));
-  } catch (err) {
-    $("prog").classList.add("hidden");
-    $("picked").classList.remove("hidden");
-    const el = $("perr"); el.textContent = "⚠ " + (/network/i.test(err.message) ? "The connection dropped during upload. Check the internet and press Upload again." : err.message); el.classList.remove("hidden");
-  }
+  // ---- team photo
+  const photo = $("photo");
+  photo.onchange = () => {
+    const f = photo.files[0]; photo.value = ""; showErr("pherr", "");
+    if (!f) return;
+    const okExt = /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name) || /^image\//.test(f.type);
+    if (!okExt) return showErr("pherr", "Please choose a photo (JPG or PNG).");
+    if (f.size > 25 * 1048576) return showErr("pherr", "This photo is very large. Please choose one under 25 MB.");
+    photoFile = f;
+    $("phpreview").src = URL.createObjectURL(f);
+    $("phpreview").classList.remove("hidden"); $("phempty").classList.add("hidden");
+    $("phpicked").textContent = `New photo selected: ${f.name} — it will be uploaded when you press Submit`;
+    $("phpicked").classList.remove("hidden");
+    refresh();
+  };
+
+  // ---- one Submit for both
+  $("submit").onclick = async () => {
+    const btn = $("submit");
+    btn.disabled = true; btn.textContent = "Submitting… keep this page open";
+    const done = [];
+    try {
+      if (chosen) {
+        $("prog").classList.remove("hidden"); $("repick").disabled = true;
+        await api.uploadPresentation(code, key, chosen, (p) => { $("pbar").style.width = `${Math.round(p * 100)}%`; $("ppct").textContent = `${Math.round(p * 100)}%`; });
+        done.push("presentation"); chosen = null;
+      }
+      if (photoFile) {
+        $("phprog").classList.remove("hidden");
+        try {
+          const blob = await compressImage(photoFile);
+          await api.uploadPhoto(code, key, blob, (p) => { $("phbar").style.width = `${Math.round(p * 100)}%`; });
+        } catch (err) {
+          throw new Error(/supported image/i.test(err.message) ? "This photo format can't be read (for example iPhone HEIC). Please send it as JPG or take a screenshot of it, then submit again." : err.message);
+        }
+        done.push("team photo"); photoFile = null;
+      }
+      toast(`Submitted ✓ ${done.join(" + ")}`);
+      teamView(await api.teamCheck(code, key));
+    } catch (err) {
+      const msg = /network/i.test(err.message) ? "The connection dropped during upload. Check the internet and press Submit again." : err.message;
+      if (done.length) toast(`${done.join(" + ")} uploaded ✓`);
+      $("prog").classList.add("hidden"); $("phprog").classList.add("hidden"); $("repick").disabled = false;
+      showErr(chosen ? "perr" : "pherr", msg);
+      btn.textContent = "✅ Submit"; refresh();
+    }
+  };
 }
 
 if (code && key) { api.teamCheck(code, key).then((t) => (t ? teamView(t) : loginView())).catch(() => loginView()); }

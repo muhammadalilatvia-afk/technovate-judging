@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Organizer – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261113c">
+<link rel="stylesheet" href="assets/app.css?v=20261115a">
 <style>
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
   .tabs button { border: 1px solid var(--line); background: rgba(255,255,255,.05); padding: 9px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; }
@@ -16,6 +16,10 @@
   .seg button.on { background: var(--orange); color: #1a1205; }
   .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
   td.num, th.num { text-align: right; }
+  .jgrid { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
+  @media (max-width: 1000px) { .jgrid { grid-template-columns: 1fr; } }
+  .jact { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .jact .btn { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
   @media print { .topbar, .tabs, .noprint { display: none !important; } body { background: #fff; color: #000; } .card { border: 0; background: #fff; } th, td { border-color: #ccc; color: #000; } }
 </style>
 </head>
@@ -31,7 +35,8 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261113c";
+import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261115a";
+import { openCertificates } from "./js/certificates.js?v=20261115c";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -383,14 +388,14 @@ function roundsPane(pane, { teams, boards }) {
 
 // ----------------------------------------------------------------- judges --
 function judgesPane(pane, { judges }) {
-  pane.innerHTML = `<div class="grid cols-2">
-    <section class="card"><h2>Judges</h2>
+  pane.innerHTML = `<div class="grid jgrid">
+    <section class="card" style="min-width:0"><h2>Judges</h2>
       <table><thead><tr><th>Name</th><th class="num">Scores given</th><th>Status</th><th></th></tr></thead><tbody>
       ${judges.map((j) => `<tr><td><b>${esc(j.name)}</b></td><td class="num">${j.scores}</td>
         <td>${j.active ? `<span class="badge ok">ACTIVE</span>` : `<span class="badge off">REMOVED</span>`}</td>
-        <td style="white-space:nowrap"><button class="btn" data-ren="${j.id}" data-name="${esc(j.name)}">✎ Rename</button>
+        <td><div class="jact"><button class="btn" data-ren="${j.id}" data-name="${esc(j.name)}">✎ Rename</button>
           <button class="btn" data-pin="${j.id}" data-name="${esc(j.name)}">🔑 New PIN</button>
-          <button class="btn ${j.active ? "danger" : ""}" data-j="${j.id}" data-a="${j.active ? 0 : 1}">${j.active ? "Remove" : "Restore"}</button></td></tr>`).join("")}
+          <button class="btn ${j.active ? "danger" : ""}" data-j="${j.id}" data-a="${j.active ? 0 : 1}">${j.active ? "Remove" : "Restore"}</button></div></td></tr>`).join("")}
       </tbody></table>
       <p class="muted small">Removing a judge keeps their submitted scores but hides them from the live screen and stops further scoring.</p></section>
     <section class="card stack"><h2>➕ Add an extra judge</h2>
@@ -464,6 +469,14 @@ async function results(pane, { st, boards }) {
     </tbody></table></div>
     <p class="muted small">${criteria.map((c) => `C${c.id} = ${esc(c.name)}`).join(" · ")} · Judge columns = total out of ${maxTotal}.</p>
   </section>
+  <section class="card noprint" style="margin-top:18px"><h2>🎓 Certificates</h2>
+    <p class="muted small">Generated automatically from the ranking above: one A4 certificate per place (1st, 2nd, 3rd … up to the number you choose). Open them, then print or “Save as PDF”.
+      ${ranked.some((r) => r.rank) ? "" : "<b>No scores yet in this round.</b>"}</p>
+    <div class="row">
+      <label class="field" style="width:auto"><span>Places</span><select id="ctop">${[3, 5, 10].map((n) => `<option value="${n}" ${n === (rid === 2 ? 10 : rid === 3 ? 3 : 10) ? "selected" : ""}>Top ${n}</option>`).join("")}</select></label>
+      <label class="field" style="width:auto"><span>Certificates for</span><select id="cper"><option value="1">Each student (named)</option><option value="0">Each team</option></select></label>
+      <button class="btn primary" id="certs" style="align-self:flex-end">🎓 Generate certificates</button>
+    </div></section>
   <section class="card noprint" style="margin-top:18px"><h2>Danger zone</h2>
     <p class="muted small">Deletes every judge score in ${esc(round.name)}. Download a backup first.</p>
     <button class="btn danger" id="reset">Delete all ${esc(round.name)} scores</button></section>`;
@@ -482,6 +495,11 @@ async function results(pane, { st, boards }) {
     download(`technovate-backup-${stamp}.json`, JSON.stringify(all, null, 2), "application/json");
   };
   document.getElementById("print").onclick = () => window.print();
+  document.getElementById("certs").onclick = () => {
+    const res = openCertificates({ round, rows: ranked, top: Number(document.getElementById("ctop").value), perStudent: document.getElementById("cper").value === "1" });
+    if (!res.count) toast(`No ranked teams in ${round.name} yet — certificates appear once judges have scored.`, "err");
+    else toast(`${res.count} certificates ready — press “Print / Save as PDF”`);
+  };
   document.getElementById("reset").onclick = async () => {
     if (prompt(`Type DELETE to remove all ${round.name} scores`) !== "DELETE") return;
     await run(() => api.adminResetRound(pin, rid), "Scores deleted"); render();
