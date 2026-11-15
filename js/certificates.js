@@ -3,6 +3,12 @@ import { EVENT } from "./config.js?v=20261115a";
 
 const ordinal = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Signatories printed on every placed (1st–10th) certificate: [name, title]
+const SIGNERS = [
+  ["Prof. Muratov Gayrat Azatovich", "Doctor of Science – Rector of AUT"],
+  ["Ulugbek Ruzimov", "Head of Academic Affairs"],
+];
+const sig = ([name, title]) => `<div class="sig"><div class="sl"></div>${name ? `<div class="sn">${esc(name)}</div>` : ""}<div class="st">${esc(title)}</div></div>`;
 export const splitMembers = (m) => String(m || "").split(/[;,\n]+/).map((x) => x.trim()).filter(Boolean);
 
 // rows: ranked rows ({ rank, code, project, members }); only rank 1..top are used.
@@ -33,9 +39,9 @@ export function openCertificates({ round, rows, top = 10, perStudent = true }) {
           for achieving <b>${what}</b> in <b>${esc(round.name)}</b> of the ${esc(EVENT.name)}.</div>
         <div class="badge" style="--m:${medal}"><span class="big">${ordinal(c.rank)}</span><span class="sm">PLACE</span></div>
         <div class="foot">
-          <div class="sig"><div class="sl"></div>Organizing Committee</div>
+          ${sig(c.rank <= 10 ? SIGNERS[0] : ["", "Organizing Committee"])}
           <div class="meta">${esc(EVENT.date)}<br>${esc(EVENT.venue)}</div>
-          <div class="sig"><div class="sl"></div>Head of the Judging Panel</div>
+          ${sig(c.rank <= 10 ? SIGNERS[1] : ["", "Head of the Judging Panel"])}
         </div>
       </div></div></section>`;
   };
@@ -61,7 +67,7 @@ export function openCertificates({ round, rows, top = 10, perStudent = true }) {
     display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: inset 0 0 0 2.2mm rgba(255,255,255,.45), 0 4px 12px rgba(0,0,0,.18); }
   .badge .big { font: 900 30px/1 "Segoe UI", Arial; } .badge .sm { font-size: 9px; font-weight: 800; letter-spacing: 1.5px; margin-top: 1mm; }
   .foot { margin-top: auto; width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: end; gap: 10mm; font-size: 14px; color: #4b5878; }
-  .sig .sl { height: 1.5px; background: #0A1A3F; margin: 0 8mm 2mm; } .meta { font-weight: 700; color: #0A1A3F; line-height: 1.5; }
+  .sig .sl { height: 1.5px; background: #0A1A3F; margin: 0 4mm 2mm; } .sig .sn { font-weight: 800; font-size: 15px; color: #0A1A3F; } .sig .st { font-size: 12.5px; margin-top: .5mm; } .meta { font-weight: 700; color: #0A1A3F; line-height: 1.5; }
   @media print { body { background: #fff; } .bar { display: none; } .cert { margin: 0; box-shadow: none; } }
 </style></head><body>
 <div class="bar"><b>${certs.length} certificate${certs.length > 1 ? "s" : ""}</b> · ${esc(round.name)} · places 1–${Math.min(top, Math.max(...winners.map((w) => w.rank)))}
