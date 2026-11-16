@@ -27,6 +27,10 @@
   .guest span { display: block; margin-top: 6px; font-size: 13px; color: var(--orange); font-weight: 600; line-height: 1.35; }
   @media (max-width: 1000px) { .ggrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 560px) { .ggrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .guest img { width: 96px; height: 96px; } }
+  .sched td.t { white-space: nowrap; font-weight: 800; color: var(--orange); width: 120px; }
+  .sched .tg { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 5px; margin-right: 6px; color: #fff; vertical-align: 1px; }
+  .sched .g1 { background: #2563eb; } .sched .g2 { background: #e07b00; } .sched .g3 { background: #7c3aed; }
+  .sched tr.b td { color: var(--muted); }
   @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } .hero img.mark { display: none; } }
 </style>
 </head>
@@ -52,6 +56,26 @@
       </div>
     </div>
     <img class="mark" src="assets/technovate-mark.svg" alt="">
+  </section>
+
+  <section class="card sched" style="margin-top:20px">
+    <div class="row" style="justify-content:space-between">
+      <div><div class="badge orange">18 NOVEMBER 2026 · ANGOR HALL</div><h2 style="margin:10px 0 0">📅 Event schedule</h2></div>
+      <a class="btn primary" href="assets/schedule/Event-Schedule-2026.pdf" target="_blank" rel="noopener">⬇ Download PDF</a>
+    </div>
+    <div style="overflow:auto;margin-top:12px"><table><thead><tr><th>Time</th><th>Activity</th><th>Details</th></tr></thead><tbody>
+      <tr class="b"><td class="t">08:30–09:00</td><td><b>Registration</b></td><td class="muted">Check in, collect your badge, find your team seat</td></tr>
+      <tr class=""><td class="t">09:00–09:10</td><td><span class="tg g1">ROUND 1</span><b>Opening</b></td><td class="muted">Welcome speech, rules and scoring explained</td></tr>
+      <tr class=""><td class="t">09:10–11:20</td><td><span class="tg g1">ROUND 1</span><b>Team presentations</b></td><td class="muted">IT Business 3rd-year teams: 3 min pitch + 1 min Q&amp;A</td></tr>
+      <tr class=""><td class="t">11:20–11:30</td><td><span class="tg g1">ROUND 1</span><b>Round 1 results</b></td><td class="muted">Top 20 (qualify for Round 2) and Round 1 top 3 announced</td></tr>
+      <tr class="b"><td class="t">11:30–13:30</td><td><b>Lunch break</b></td><td class="muted">Round 2 teams get ready</td></tr>
+      <tr class=""><td class="t">13:30–15:30</td><td><span class="tg g2">ROUND 2</span><b>Team presentations</b></td><td class="muted">Top 20 from Round 1 + other Ajou teams: 3 min pitch + 1 min Q&amp;A</td></tr>
+      <tr class="b"><td class="t">15:30–16:00</td><td><b>Break · Round 2 results</b></td><td class="muted">Top 10 (certificates) and the 5 finalists announced</td></tr>
+      <tr class=""><td class="t">16:00–16:45</td><td><span class="tg g3">FINAL</span><b>Final presentations</b></td><td class="muted">Top 5 teams: 6 min pitch + 3 min Q&amp;A</td></tr>
+      <tr class=""><td class="t">16:45–17:00</td><td><span class="tg g3">FINAL</span><b>Judges' deliberation</b></td><td class="muted">Final scores confirmed</td></tr>
+      <tr class="b"><td class="t">17:00–17:30</td><td><b>Awards &amp; closing</b></td><td class="muted">Prizes, certificates, 1st–3rd place, group photo</td></tr>
+    </tbody></table></div>
+    <p class="muted small" style="margin:8px 0 0">Every team is scored by an expert judging panel plus the AI Innovation &amp; Evaluation Judge. Guests, faculty and students are welcome to watch.</p>
   </section>
 
   <section class="card guests" style="margin-top:20px">
