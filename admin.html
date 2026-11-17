@@ -627,6 +627,16 @@ async function start() {
   lo.onclick = () => { sessionStorage.removeItem("adminPin"); location.reload(); };
   // live refresh only on the control tab, and never while typing
   api.subscribe(() => { if (["control", "dashboard", "presentations"].includes(tab) && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) safeRender(); });
+  // Event judges from the list are created automatically (once) and the current round's panel is switched on.
+  try {
+    const created = await addEventJudges();
+    if (created.length) {
+      const st = await api.getState();
+      const res = await applyPanel(st.active_round || 1);
+      showPins(created);
+      toast(`${created.length} judges added · ${roundName(st.active_round || 1)} panel active (${res.active} judges)`);
+    }
+  } catch (e) { toast("Could not add event judges: " + e.message, "err"); }
   safeRender();
 }
 pin && (await api.adminCheck(pin).catch(() => false)) ? start() : loginView();
