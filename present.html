@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presentation Screen – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css?v=20261117b">
+<style>
+  html, body { height: 100%; }
+  body.pres { margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .pbar { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: rgba(10,26,63,.96); border-bottom: 1px solid var(--line); transition: opacity .3s, margin .3s; z-index: 5; }
+  .pbar .who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
+  .pbar .code { background: var(--orange); color: #1a1205; font-weight: 900; border-radius: 8px; padding: 4px 10px; font-size: 18px; }
+  .pbar .proj { font-weight: 800; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pbar .pos { color: var(--muted); font-size: 14px; white-space: nowrap; }
+  .pbar .btn { white-space: nowrap; }
+  body.idle .pbar { opacity: 0; margin-top: -56px; pointer-events: none; }
+  #stage { flex: 1; position: relative; background: #000; }
+  #stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+  .msg { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 18px;
+    background: radial-gradient(900px 500px at 50% 0%, rgba(247,147,30,.25), transparent 60%), #0A1A3F; color: #fff; padding: 30px; }
+  .msg h1 { font-size: 54px; margin: 0; } .msg h1 span { color: var(--orange); }
+  .msg .big { font-size: 26px; color: var(--muted); }
+  .hint { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: #fff; background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 8px; z-index: 3; }
+</style>
+</head>
+<body class="pres">
+<div class="pbar" id="bar">
+  <img src="assets/technovate-mark.svg" width="34" height="34" alt="">
+  <div class="who" id="who"><span class="muted">Presentation screen</span></div>
+  <span id="mode"></span>
+  <button class="btn" id="prev" title="Previous team (B)">◀ Previous</button>
+  <button class="btn primary" id="next" title="Next team (N)">Next presentation ▶</button>
+  <a class="btn" id="open" target="_blank" rel="noopener" title="Open the file in a new tab">⬇ File</a>
+  <button class="btn" id="fs" title="Full screen (F)">⛶ Full screen</button>
+</div>
+<div id="stage"></div>
+<div id="hot" style="position:fixed;top:0;left:0;right:0;height:12px;z-index:6"></div>
+
+<script type="module">
+import { getApi, esc, toast, modeBadge } from "./js/common.js?v=20261117b";
+const api = await getApi();
+document.getElementById("mode").innerHTML = modeBadge(api);
+const stage = document.getElementById("stage"), who = document.getElementById("who");
+let pin = sessionStorage.getItem("adminPin");
+let shownKey = null, files = {}, lineup = [], st = null, round = null;
+const rounds = await api.getRounds();
+
+function viewerUrl(url, name) {
+  const ext = (name || url).split("?")[0].split(".").pop().toLowerCase();
+  if (ext === "pdf") return url + "#view=Fit&toolbar=0&navpanes=0";
+  if (["ppt", "pptx", "pps", "ppsx"].includes(ext)) return "https://view.officeapps.live.com/op/embed.aspx?src=" + encodeURIComponent(url);
+  return url;
+}
+
+function loginView(msg = "") {
+  stage.innerHTML = `<div class="msg"><img src="assets/technovate-mark.svg" width="120" alt="">
+    <h1>Presentation <span>screen</span></h1>
+    <div class="big">Shows the slides of the team on stage. Enter the organizer PIN to start.</div>
+    ${api.mode === "demo" ? `<p class="small"><span class="badge demo">DEMO</span> Organizer PIN: 0000</p>` : ""}
+    <form id="f" class="row" style="justify-content:center"><input type="password" id="pin" placeholder="Organizer PIN" autocomplete="off" style="width:240px" autofocus>
+      <button class="btn primary big">Start</button></form>${msg ? `<div class="toast err" style="position:static">${esc(msg)}</div>` : ""}</div>`;
+  document.getElementById("f").onsubmit = async (e) => {
+    e.preventDefault();
+    const p = document.getElementById("pin").value.trim();
+    if (!(await api.adminCheck(p).catch(() => false))) return loginView("Wrong PIN");
+    pin = p; sessionStorage.setItem("adminPin", p); start();
+  };
+}
+
+async function loadFiles() {
+  const pres = await api.adminPresentations(pin);
+  files = Object.fromEntries(pres.filter((p) => p.file_path).map((p) => [p.team_id, p]));
+}
+
+async function render(force = false) {
+  st = await api.getState();
+  round = rounds.find((r) => r.id === st.active_round) || rounds[0];
+  lineup = (await api.getLeaderboard(round.id)).sort((a, b) => a.position - b.position);
+  const idx = lineup.findIndex((t) => t.team_id === st.current_team_id);
+  const team = lineup[idx];
+  document.getElementById("prev").disabled = idx <= 0;
+  document.getElementById("next").disabled = idx >= lineup.length - 1;
+  const openBtn = document.getElementById("open");
+  if (!team) {
+    who.innerHTML = `<span class="badge orange">${esc(round.name)}</span><span class="muted">No team on stage</span>`;
+    openBtn.style.display = "none";
+    if (shownKey !== "none") {
+      shownKey = "none";
+      stage.innerHTML = `<div class="msg"><img src="assets/technovate-mark.svg" width="150" alt=""><h1>${esc(round.name)} <span>presentations</span></h1>
+        <div class="big">${lineup.length} teams · press <b>Next presentation ▶</b> to open the first team's slides.</div></div>`;
+    }
+    return;
+  }
+  const f = files[team.team_id];
+  who.innerHTML = `<span class="code">${esc(team.code)}</span><span class="proj">${esc(team.project)}</span><span class="pos">${esc(round.name)} · ${idx + 1} / ${lineup.length}</span>`;
+  const key = `${team.team_id}:${f?.file_path || ""}`;
+  if (key === shownKey && !force) return;
+  shownKey = key;
+  if (f) {
+    const url = api.fileUrl(f.file_path);
+    openBtn.style.display = ""; openBtn.href = url;
+    if (!url || url === "#") {
+      stage.innerHTML = `<div class="msg"><h1>${esc(team.code)}</h1><div class="big">📎 ${esc(f.file_name)}<br>(demo mode: files are not stored online)</div></div>`;
+    } else {
+      stage.innerHTML = `<iframe src="${esc(viewerUrl(url, f.file_name))}" allow="fullscreen" allowfullscreen title="Slides"></iframe>
+        <div class="hint">📎 ${esc(f.file_name)} · click the slides, then use ← → or the clicker</div>`;
+    }
+  } else {
+    openBtn.style.display = "none";
+    stage.innerHTML = `<div class="msg"><div class="code" style="font-size:40px;background:var(--orange);color:#1a1205;border-radius:14px;padding:6px 22px;font-weight:900">${esc(team.code)}</div>
+      <h1>${esc(team.project)}</h1><div class="big">No slides uploaded — please use the team's USB stick.</div></div>`;
+  }
+}
+
+async function goTo(step) {
+  const idx = lineup.findIndex((t) => t.team_id === st.current_team_id);
+  const t = lineup[idx + step] || (idx < 0 && step > 0 ? lineup[0] : null);
+  if (!t) return;
+  try {
+    await api.adminSetState(pin, { current_team_id: t.team_id, scoring_open: false, view: "intro" });
+    await loadFiles(); await render();
+  } catch (e) { toast(e.message, "err"); if (/PIN/i.test(e.message)) { sessionStorage.removeItem("adminPin"); loginView(e.message); } }
+}
+
+async function start() {
+  await loadFiles(); await render(true);
+  document.getElementById("next").onclick = () => goTo(1);
+  document.getElementById("prev").onclick = () => goTo(-1);
+  document.getElementById("fs").onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  // follow the organizer: when the team on stage changes anywhere, switch slides here
+  api.subscribe(async () => { const before = st?.current_team_id; const s2 = await api.getState(); if (s2.current_team_id !== before || s2.active_round !== st?.active_round) { await loadFiles(); render(); } });
+  setInterval(() => loadFiles().then(() => render()).catch(() => {}), 60000);
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT") return;
+    if (e.key === "n" || e.key === "N") goTo(1);
+    if (e.key === "b" || e.key === "B") goTo(-1);
+    if (e.key === "f" || e.key === "F") document.getElementById("fs").click();
+  });
+  // hide the control bar after 3 s without mouse movement (full-screen look)
+  let t; const wake = () => { document.body.classList.remove("idle"); clearTimeout(t); t = setTimeout(() => document.body.classList.add("idle"), 3000); };
+  document.addEventListener("mousemove", wake); document.getElementById("hot").onmouseenter = wake; wake();
+}
+
+pin && (await api.adminCheck(pin).catch(() => false)) ? start() : loginView();
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 // Printable certificates (A4 landscape, one per page) generated from a round's ranking.
-import { EVENT } from "./config.js?v=20261115a";
+import { EVENT } from "./config.js?v=20261117b";
 
 const ordinal = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

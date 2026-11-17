@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Organizer – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261115a">
+<link rel="stylesheet" href="assets/app.css?v=20261117b">
 <style>
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
   .tabs button { border: 1px solid var(--line); background: rgba(255,255,255,.05); padding: 9px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; }
@@ -29,14 +29,16 @@
     <span><b>AJOU TECHNOVATE</b><small>HACKATHON 3.0 · ORGANIZER</small></span></a>
   <span class="spacer"></span>
   <span id="mode"></span>
+  <a class="btn" href="present.html" target="_blank">Presentation screen ↗</a>
   <a class="btn" href="live.html" target="_blank">Open live screen ↗</a>
   <button class="btn hidden" id="logout">Log out</button>
 </header>
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261115a";
-import { openCertificates } from "./js/certificates.js?v=20261117a";
+import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261117b";
+import { openCertificates } from "./js/certificates.js?v=20261117b";
+import { JUDGE_PANELS, JUDGE_ROSTER } from "./js/config.js?v=20261117b";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -48,6 +50,69 @@ let resultsRound = null;
 let showKeys = false;   // upload codes stay visible until "Hide" is clicked (survives auto-refresh)
 
 const run = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message, "err"); throw e; } };
+
+// ---------------------------------------------------- event-day helpers --
+const norm = (n) => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
+const roundName = (id) => rounds.find((r) => r.id === id)?.name || `Round ${id}`;
+// Make exactly the given round's panel ACTIVE (others inactive; their scores are kept).
+async function applyPanel(roundId) {
+  const want = new Set((JUDGE_PANELS[roundId] || []).map(norm));
+  const judges = await api.adminListJudges(pin);
+  const found = new Set(judges.map((j) => norm(j.name)));
+  const missing = (JUDGE_PANELS[roundId] || []).filter((n) => !found.has(norm(n)));
+  let changed = 0;
+  for (const j of judges) {
+    const should = want.has(norm(j.name));
+    if (!!j.active !== should) { await api.adminSetJudgeActive(pin, j.id, should); changed++; }
+  }
+  return { active: judges.filter((j) => want.has(norm(j.name))).length, changed, missing };
+}
+// Create missing roster judges with random PINs generated here in the browser; returns [{name, pin}]
+async function addEventJudges() {
+  const judges = await api.adminListJudges(pin);
+  const have = new Set(judges.map((j) => norm(j.name)));
+  const created = [], used = new Set();
+  for (const name of JUDGE_ROSTER) {
+    if (have.has(norm(name))) continue;
+    let p;
+    do { const a = new Uint32Array(1); crypto.getRandomValues(a); p = String(100000 + (a[0] % 900000)); } while (used.has(p));
+    used.add(p);
+    await api.adminAddJudge(pin, name, p);
+    created.push({ name, pin: p });
+  }
+  return created;
+}
+function showPins(list) {
+  document.getElementById("pinOverlay")?.remove();
+  const ov = document.createElement("div");
+  ov.id = "pinOverlay";
+  ov.style.cssText = "position:fixed;inset:0;z-index:1000;background:rgba(3,8,22,.88);display:flex;align-items:center;justify-content:center;padding:20px";
+  ov.innerHTML = `<div class="card" style="max-width:620px;width:100%;max-height:92vh;overflow:auto">
+    <h2>🔑 Judge PINs — keep private</h2>
+    <p class="muted small">These PINs are shown <b>only now</b>. A CSV file was also downloaded. Send each judge their own PIN privately.</p>
+    <table><thead><tr><th>Judge</th><th>PIN</th></tr></thead><tbody>${list.map((x) => `<tr><td>${esc(x.name)}</td><td><code style="font-size:18px;letter-spacing:2px">${esc(x.pin)}</code></td></tr>`).join("")}</tbody></table>
+    <div class="row" style="margin-top:12px"><button class="btn" id="pinDl">⬇ Download again</button><span style="flex:1"></span><button class="btn primary" id="pinClose">I saved them — close</button></div></div>`;
+  document.body.appendChild(ov);
+  const dl = () => download("judge-PINs-KEEP-PRIVATE.csv", toCsv([["judge", "pin", "judge_page"], ...list.map((x) => [x.name, x.pin, new URL("judge.html", location.href).href])]));
+  dl();
+  ov.querySelector("#pinDl").onclick = dl;
+  ov.querySelector("#pinClose").onclick = () => ov.remove();
+}
+async function goLive(D) {
+  const r1Ids = D.teams.filter((t) => t.round1).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })).map((t) => t.id);
+  const msg = "GO LIVE — event-day setup. This will:\n\n" +
+    "• Close uploads\n• Hide scores on the live screen (results only at the ceremony)\n• Set Round 1 as the active round, scoring closed\n" +
+    "• Make only the Round 1 judge panel ACTIVE\n" +
+    (D.boards[1].length ? "• Keep the existing Round 1 line-up" : `• Build the Round 1 line-up (${r1Ids.length} teams)`) +
+    "\n• Show the Welcome screen on the projector\n\nContinue?";
+  if (!confirm(msg)) return;
+  const res = await run(() => applyPanel(1));
+  if (!D.boards[1].length && r1Ids.length) await run(() => api.adminSetRoundTeams(pin, 1, r1Ids));
+  await run(() => api.adminSetState(pin, { uploads_open: false, show_scores: false, active_round: 1, current_team_id: null, scoring_open: false, view: "welcome", message: "" }),
+    `🚀 Live! Round 1 ready · ${res.active} judges active`);
+  if (res.missing.length) toast(`Not found in Judges tab: ${res.missing.join(", ")}. Press "Add event judges" in the Judges tab.`, "err");
+  tab = "control"; sessionStorage.setItem("adminTab", tab); render();
+}
 
 // ------------------------------------------------------------------ login --
 async function loginView(msg = "") {
@@ -109,7 +174,7 @@ function advanceBanner({ st, boards, rstatus }) {
     const next = rounds[round.id], n = boards[next.id].length;
     return `<div class="card" style="margin-bottom:16px;border-color:var(--green);background:rgba(34,197,94,.12)">
       <h2 style="margin:0 0 6px">✅ ${esc(round.name)} complete — ${n} teams are now in ${esc(next.name)}</h2>
-      <p class="muted small" style="margin:0 0 10px">The top ${round.qualify_top}${round.id === 1 ? " plus the teams that skip Round 1" : ""} were moved automatically. Announce the results, then start the next round.</p>
+      <p class="muted small" style="margin:0 0 10px">The top ${round.qualify_top}${round.id === 1 ? " plus the teams that skip Round 1" : ""} were moved automatically. Results stay hidden until the ceremony. <b>Start ${esc(next.name)}</b> also switches the judges to the ${esc(next.name)} panel.</p>
       <button class="btn green big" data-start="${next.id}">▶ Start ${esc(next.name)}</button>
       <button class="btn" data-view-now="podium">🏆 Show ${esc(round.name)} top 3 on screen</button></div>`;
   }
@@ -120,7 +185,9 @@ function advanceBanner({ st, boards, rstatus }) {
 function wireBanner(pane, st) {
   pane.querySelectorAll("[data-start]").forEach((b) => b.onclick = async () => {
     const id = Number(b.dataset.start);
-    await run(() => api.adminSetState(pin, { active_round: id, current_team_id: null, scoring_open: false, view: "welcome" }), `${rounds[id - 1].name} started`);
+    const res = await run(() => applyPanel(id));
+    await run(() => api.adminSetState(pin, { active_round: id, current_team_id: null, scoring_open: false, view: "welcome" }), `${rounds[id - 1].name} started · ${res.active} judges active`);
+    if (res.missing.length) toast(`Not found in Judges tab: ${res.missing.join(", ")}`, "err");
     render();
   });
   pane.querySelectorAll("[data-view-now]").forEach((b) => b.onclick = async () => {
@@ -204,7 +271,13 @@ function dashboard(pane, D) {
       <td>${top ? `${esc(top.code)} · ${fmt(top.score)}` : "–"}</td></tr>`;
   }).join("");
   const missing = pres.filter((p) => !p.file_name);
+  const live = !st.uploads_open && !st.show_scores;
   pane.innerHTML = advanceBanner(D) + `
+    <section class="card golive" style="margin-bottom:18px;border-color:${live ? "var(--green)" : "rgba(247,147,30,.7)"};background:${live ? "rgba(34,197,94,.10)" : "rgba(247,147,30,.10)"}">
+      <div class="row"><div style="flex:1;min-width:260px"><h2 style="margin:0">${live ? "✅ Event is live" : "🚀 Event day: Go live"}</h2>
+        <p class="muted small" style="margin:6px 0 0">${live ? "Uploads closed · scores hidden until the ceremony. Run the rounds from <b>Event control</b>." : "One click: close uploads, hide scores, set Round 1, activate the Round 1 judge panel, build the Round 1 line-up and show the Welcome screen."}</p></div>
+        <button class="btn ${live ? "" : "primary big"}" id="goLive">${live ? "Run Go live again" : "🚀 GO LIVE"}</button></div>
+    </section>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
       ${stat("Teams", teams.length, `${teams.filter((t) => t.round1).length} in Round 1 · ${teams.filter((t) => !t.round1).length} from Round 2`)}
       ${stat("Students", students, "registered participants")}
@@ -234,6 +307,7 @@ function dashboard(pane, D) {
       <div class="pill-list">${missing.map((p) => `<button title="${esc(p.project)}">${esc(p.code)}</button>`).join("") || `<span class="muted">All teams have uploaded 🎉</span>`}</div>
     </section>`;
   wireBanner(pane, st);
+  document.getElementById("goLive").onclick = () => goLive(D);
   document.getElementById("tglUploads").onclick = () => run(() => api.adminSetState(pin, { uploads_open: !st.uploads_open }), "Saved").then(render);
 }
 
@@ -398,6 +472,14 @@ function judgesPane(pane, { judges }) {
           <button class="btn ${j.active ? "danger" : ""}" data-j="${j.id}" data-a="${j.active ? 0 : 1}">${j.active ? "Remove" : "Restore"}</button></div></td></tr>`).join("")}
       </tbody></table>
       <p class="muted small">Removing a judge keeps their submitted scores but hides them from the live screen and stops further scoring.</p></section>
+<div class="stack">
+    <section class="card stack" style="border-color:rgba(247,147,30,.6)"><h2>🧑‍⚖️ Event judges &amp; panels</h2>
+      <p class="muted small">${JUDGE_ROSTER.length} judges for 18 November. ${(() => { const have = new Set(judges.map((j) => norm(j.name))); const miss = JUDGE_ROSTER.filter((n) => !have.has(norm(n))); return miss.length ? `<b style="color:#fca5a5">${miss.length} not created yet.</b>` : `<b style="color:#86efac">All created ✓</b>`; })()}</p>
+      <button class="btn primary" id="addEvent">➕ Add event judges (with PINs)</button>
+      <p class="muted small" style="margin:0">Make one round's panel ACTIVE (others become inactive; their scores are kept). <b>Go live</b> and <b>Start Round 2 / Final</b> do this automatically.</p>
+      <div class="row">${rounds.map((r) => `<button class="btn" data-panel="${r.id}">${esc(r.name)} panel</button>`).join("")}</div>
+      <details class="small"><summary>Who is in each panel</summary>${rounds.map((r) => `<p style="margin:6px 0"><b>${esc(r.name)}:</b> ${(JUDGE_PANELS[r.id] || []).map(esc).join(", ")}</p>`).join("")}</details>
+    </section>
     <section class="card stack"><h2>➕ Add an extra judge</h2>
       <p class="muted small">New judges can join at any time, even in the middle of a round. Their scores count for the teams they score; a team's result is the average of the judges who scored it.</p>
       <label class="field"><span>Name shown on the live screen</span><input type="text" id="jn" placeholder="e.g. Dr. Karimov"></label>
@@ -406,7 +488,18 @@ function judgesPane(pane, { judges }) {
       <button class="btn" id="jgen">Generate random PIN</button>
       ${api.mode !== "demo" ? `<hr style="border-color:var(--line);width:100%"><h2>Organizer PIN</h2>
       <label class="field"><span>New organizer PIN</span><input type="password" id="np"></label><button class="btn" id="npb">Change PIN</button>` : ""}
-    </section></div>`;
+    </section></div></div>`;
+  document.getElementById("addEvent").onclick = async () => {
+    const created = await run(() => addEventJudges());
+    if (!created.length) { toast("All event judges already exist. Use 🔑 New PIN to change a PIN."); return; }
+    showPins(created); render();
+  };
+  pane.querySelectorAll("[data-panel]").forEach((b) => b.onclick = async () => {
+    const id = Number(b.dataset.panel);
+    const res = await run(() => applyPanel(id), `${roundName(id)} panel active`);
+    if (res.missing.length) toast(`Not found: ${res.missing.join(", ")}`, "err");
+    render();
+  });
   pane.querySelectorAll("[data-j]").forEach((b) => b.onclick = async () => { await run(() => api.adminSetJudgeActive(pin, Number(b.dataset.j), b.dataset.a === "1"), "Saved"); render(); });
   pane.querySelectorAll("[data-ren]").forEach((b) => b.onclick = async () => {
     const name = prompt("New name shown on the live screen:", b.dataset.name);

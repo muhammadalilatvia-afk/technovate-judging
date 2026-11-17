@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ajou Technovate Hackathon 3.0 – Judging</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261115a">
+<link rel="stylesheet" href="assets/app.css?v=20261117b">
 <style>
   .hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 30px; align-items: center; padding: 40px 0 10px; }
   .hero h1 { font-size: clamp(36px, 5vw, 64px); font-weight: 900; letter-spacing: -1px; }
@@ -98,9 +98,11 @@
       <p class="muted" style="margin:4px 0 0">PowerPoint or PDF, up to 50 MB. You need your team code and the 6-digit upload code from the organizers.</p></div>
     <span class="btn primary" style="margin-left:auto">Upload ▶</span></a>
 
-  <section class="grid cols-3" style="margin-top:20px">
+  <section class="grid" style="margin-top:20px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
     <a class="card tile" href="live.html"><div class="ico">📺</div><h2>Live results screen</h2>
       <p class="muted">Open on the projector. Shows the team on stage, judges' progress and the live ranking.</p></a>
+    <a class="card tile" href="present.html"><div class="ico">🖥️</div><h2>Presentation screen</h2>
+      <p class="muted">Second screen: shows the slides of the team on stage. Next presentation moves everything to the next team.</p></a>
     <a class="card tile" href="judge.html"><div class="ico">⚖️</div><h2>Judge scoring</h2>
       <p class="muted">For the 5 judges' computers. Log in with your judge PIN and score the team on stage.</p></a>
     <a class="card tile" href="admin.html"><div class="ico">🛠️</div><h2>Organizer control</h2>
@@ -118,7 +120,7 @@
   <p class="muted small" style="text-align:center;margin-top:30px">Ajou University in Tashkent · Open-source judging system · <a href="https://t.me/AJOUH2025">Telegram</a></p>
 </main>
 <script type="module">
-  import { getApi, modeBadge } from "./js/common.js?v=20261115a";
+  import { getApi, modeBadge } from "./js/common.js?v=20261117b";
   const api = await getApi();
   document.getElementById("mode").innerHTML = modeBadge(api) || '<span class="badge ok">LIVE DATABASE</span>';
 </script>

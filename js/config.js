@@ -23,3 +23,13 @@ export const EVENT = {
   venue: "Angor Hall, Ajou University in Tashkent",
   telegram: "https://t.me/AJOUH2025",
 };
+
+// Event-day judge roster and the panel for each round (names must match the Judges tab exactly).
+// "Add event judges" creates missing accounts; "Go live" / "Start Round 2" / "Start Final" activate the matching panel.
+const AI_JUDGE = "AI Innovation & Evaluation Judge";
+export const JUDGE_PANELS = {
+  1: ["Siroj Khayitov", "Egamberdiyev Oybek", "Mirjakhon", "Aziza Tukhtaeva", "Zulfiya Anvarbekovna", AI_JUDGE],
+  2: ["Azamat Toshtemirov", "Dr Irtaza Nawaz", "Tehmina Rafi", "Zulfiya Anvarbekovna", AI_JUDGE],
+  3: ["Dr Sajid Khan", "Dr Adnan Manzoor", "Dr Muhammad Bilal", AI_JUDGE],
+};
+export const JUDGE_ROSTER = [...new Set([...JUDGE_PANELS[1], ...JUDGE_PANELS[2], ...JUDGE_PANELS[3]])];
