@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Organizer – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261117b">
+<link rel="stylesheet" href="assets/app.css?v=20261117c">
 <style>
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
   .tabs button { border: 1px solid var(--line); background: rgba(255,255,255,.05); padding: 9px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; }
@@ -36,9 +36,9 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261117b";
-import { openCertificates } from "./js/certificates.js?v=20261117b";
-import { JUDGE_PANELS, JUDGE_ROSTER } from "./js/config.js?v=20261117b";
+import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261117c";
+import { openCertificates } from "./js/certificates.js?v=20261117c";
+import { JUDGE_PANELS, JUDGE_ROSTER } from "./js/config.js?v=20261117c";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -98,6 +98,19 @@ function showPins(list) {
   ov.querySelector("#pinDl").onclick = dl;
   ov.querySelector("#pinClose").onclick = () => ov.remove();
 }
+// Like applyPanel, but first offers to create any event judges that do not exist yet (with PINs).
+async function ensurePanel(roundId) {
+  const judges = await api.adminListJudges(pin);
+  const have = new Set(judges.map((j) => norm(j.name)));
+  const missing = JUDGE_ROSTER.filter((n) => !have.has(norm(n)));
+  let created = [];
+  if (missing.length && confirm(`${missing.length} event judges are not created yet:\n\n• ${missing.join("\n• ")}\n\nCreate them now with new PINs? The PIN list is shown once and downloaded as a file.`)) {
+    created = await addEventJudges();
+  }
+  const res = await applyPanel(roundId);
+  if (created.length) showPins(created);
+  return res;
+}
 async function goLive(D) {
   const r1Ids = D.teams.filter((t) => t.round1).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })).map((t) => t.id);
   const msg = "GO LIVE — event-day setup. This will:\n\n" +
@@ -106,7 +119,7 @@ async function goLive(D) {
     (D.boards[1].length ? "• Keep the existing Round 1 line-up" : `• Build the Round 1 line-up (${r1Ids.length} teams)`) +
     "\n• Show the Welcome screen on the projector\n\nContinue?";
   if (!confirm(msg)) return;
-  const res = await run(() => applyPanel(1));
+  const res = await run(() => ensurePanel(1));
   if (!D.boards[1].length && r1Ids.length) await run(() => api.adminSetRoundTeams(pin, 1, r1Ids));
   await run(() => api.adminSetState(pin, { uploads_open: false, show_scores: false, active_round: 1, current_team_id: null, scoring_open: false, view: "welcome", message: "" }),
     `🚀 Live! Round 1 ready · ${res.active} judges active`);
@@ -185,7 +198,7 @@ function advanceBanner({ st, boards, rstatus }) {
 function wireBanner(pane, st) {
   pane.querySelectorAll("[data-start]").forEach((b) => b.onclick = async () => {
     const id = Number(b.dataset.start);
-    const res = await run(() => applyPanel(id));
+    const res = await run(() => ensurePanel(id));
     await run(() => api.adminSetState(pin, { active_round: id, current_team_id: null, scoring_open: false, view: "welcome" }), `${rounds[id - 1].name} started · ${res.active} judges active`);
     if (res.missing.length) toast(`Not found in Judges tab: ${res.missing.join(", ")}`, "err");
     render();
@@ -496,7 +509,8 @@ function judgesPane(pane, { judges }) {
   };
   pane.querySelectorAll("[data-panel]").forEach((b) => b.onclick = async () => {
     const id = Number(b.dataset.panel);
-    const res = await run(() => applyPanel(id), `${roundName(id)} panel active`);
+    const res = await run(() => ensurePanel(id));
+    toast(`${roundName(id)} panel active · ${res.active} judges`);
     if (res.missing.length) toast(`Not found: ${res.missing.join(", ")}`, "err");
     render();
   });
