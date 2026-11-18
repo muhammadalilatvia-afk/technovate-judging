@@ -21,7 +21,9 @@ export function supabaseBackend(url, key) {
   return {
     mode: "live",
     subscribe(fn) { ensureChannel(); listeners.add(fn); return () => listeners.delete(fn); },
-    getRounds: async () => ok(await sb.from("rounds").select("*").order("id")),
+    // Round 1: top 15 qualify (decided on event day) — applied here so it works even before 007_pick_teams.sql is run.
+    getRounds: async () => ok(await sb.from("rounds").select("*").order("id")).map((r) => r.id === 1
+      ? { ...r, qualify_top: 15, description: String(r.description || "").replace(/Top \d+ qualify/, "Top 15 qualify") } : r),
     getCriteria: async () => ok(await sb.from("criteria").select("*").order("position")),
     getState: async () => ok(await sb.from("state").select("*").eq("id", 1).single()),
     getTeams: async () => ok(await sb.from("teams").select("id,code,project,members,department,round1,photo_path").order("code")),
