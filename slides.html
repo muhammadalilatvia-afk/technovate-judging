@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Results slides – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css?v=20261118b">
+<style>
+  body.sl { min-height: 100vh; margin: 0; }
+  .sl-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 24px; }
+  .sl-bar h1 { font-size: 22px; margin: 0; flex: 1; min-width: 200px; }
+  .stage { position: relative; display: flex; justify-content: center; align-items: center; padding: 0 16px 16px; }
+  .stage img { max-width: 100%; max-height: calc(100vh - 140px); aspect-ratio: 16 / 9; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.45); background: #0A1A3F; cursor: pointer; }
+  .nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 30px; width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--line); background: rgba(10,26,63,.75); color: #fff; cursor: pointer; }
+  .nav.prev { left: 24px; } .nav.next { right: 24px; }
+  .dots { display: flex; gap: 8px; justify-content: center; padding-bottom: 16px; }
+  .dots button { width: 12px; height: 12px; border-radius: 50%; border: 0; background: rgba(255,255,255,.25); cursor: pointer; padding: 0; }
+  .dots button.on { background: var(--orange); }
+  body.embed .sl-bar, body.embed .dots, body.embed .nav { display: none; }
+  body.embed { background: transparent; }
+  body.embed .stage { padding: 0; height: 100vh; }
+  body.embed .stage img { max-height: 100vh; box-shadow: none; border-radius: 0; cursor: default; }
+</style>
+</head>
+<body class="sl">
+<div class="sl-bar">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="40" height="40"></a>
+  <h1 id="title"></h1>
+  <a class="btn" href="results.html">🏆 Results</a>
+  <a class="btn primary" id="dl" download>⬇ Download PowerPoint</a>
+  <button class="btn" id="fs">⛶ Full screen</button>
+</div>
+<div class="stage"><button class="nav prev" id="prev" aria-label="Previous slide">‹</button><img id="img" alt=""><button class="nav next" id="next" aria-label="Next slide">›</button></div>
+<div class="dots" id="dots"></div>
+<script type="module">
+// Slide decks published on the website (images exported from the PowerPoint file).
+const DECKS = {
+  round2: { title: "Round 2 Results", dir: "assets/results/round2/", count: 5, file: "Round-2-Results.pptx" },
+};
+const q = new URLSearchParams(location.search);
+const deck = DECKS[q.get("deck")] || DECKS.round2;
+const embed = q.has("embed");
+if (embed) document.body.classList.add("embed");
+document.title = `${deck.title} – Ajou Technovate Hackathon 3.0`;
+document.getElementById("title").textContent = `📊 ${deck.title}`;
+document.getElementById("dl").href = deck.dir + deck.file;
+const img = document.getElementById("img"), dots = document.getElementById("dots");
+dots.innerHTML = Array.from({ length: deck.count }, (_, i) => `<button data-i="${i}" aria-label="Slide ${i + 1}"></button>`).join("");
+let i = Math.min(Math.max((Number(q.get("s")) || 1) - 1, 0), deck.count - 1);
+for (let k = 1; k <= deck.count; k++) new Image().src = `${deck.dir}slide${k}.png`;  // preload
+function show(n) {
+  i = (n + deck.count) % deck.count;
+  img.src = `${deck.dir}slide${i + 1}.png`; img.alt = `${deck.title} – slide ${i + 1} of ${deck.count}`;
+  dots.querySelectorAll("button").forEach((b, k) => b.classList.toggle("on", k === i));
+}
+show(i);
+document.getElementById("prev").onclick = () => show(i - 1);
+document.getElementById("next").onclick = () => show(i + 1);
+img.onclick = () => { if (!embed) show(i + 1); };
+dots.onclick = (e) => { if (e.target.dataset.i) show(Number(e.target.dataset.i)); };
+const fs = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+document.getElementById("fs").onclick = fs;
+document.addEventListener("keydown", (e) => {
+  if (["ArrowRight", "PageDown", " "].includes(e.key)) { e.preventDefault(); show(i + 1); }
+  if (["ArrowLeft", "PageUp"].includes(e.key)) show(i - 1);
+  if (e.key === "f" || e.key === "F") fs();
+});
+// On the main screen (embedded) the slides advance on their own.
+if (embed) setInterval(() => show(i + 1), (Number(q.get("sec")) || 10) * 1000);
+</script>
+</body>
+</html>

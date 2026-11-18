@@ -57,6 +57,10 @@ async function render() {
     setScreen(`<iframe src="results.html?embed=1${api.mode === "demo" ? "&demo" : ""}" title="Results" style="border:0;width:100%;height:calc(100vh - 92px - 58px);display:block;background:transparent"></iframe>`);
     return;
   }
+  if (st.view === "slides") {   // Results slides (PowerPoint) shown on the main screen, advancing every 10 s
+    setScreen(`<iframe src="slides.html?deck=round2&embed=1" title="Results slides" style="border:0;width:100%;height:calc(100vh - 92px - 58px);display:block;background:transparent"></iframe>`);
+    return;
+  }
   if (st.view === "welcome") {
     setScreen(`<div class="center-screen">
       <img src="assets/technovate-mark.svg" width="230" alt="" class="reveal">
