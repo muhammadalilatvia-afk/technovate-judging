@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Results – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261118b">
+<link rel="stylesheet" href="assets/app.css?v=20261118c">
 <style>
   body.res { min-height: 100vh; }
   .res-wrap { padding: 22px 34px 30px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
@@ -41,11 +41,12 @@
 </header>
 <main class="res-wrap" id="screen"></main>
 <p id="slidelinks" style="text-align:center;margin:0 0 30px"><a class="btn primary" href="slides.html?deck=round2">📊 Round 2 results slides</a>
-  <a class="btn" href="assets/results/round2/Round-2-Results.pptx" download>⬇ Download PowerPoint</a></p>
+  <a class="btn" href="assets/results/round2/Round-2-Results.pptx" download>⬇ Download PowerPoint</a>
+  <a class="btn" href="appeal.html">⚖️ Appeal a result</a></p>
 
 <script type="module">
-import { getApi, esc, fmt, rank, modeBadge, clock, avatar } from "./js/common.js?v=20261118b";
-import { PUBLISHED_RESULTS, ROUND_PRIZES, SHOW_WINNERS } from "./js/config.js?v=20261118b";
+import { getApi, esc, fmt, rank, modeBadge, clock, avatar } from "./js/common.js?v=20261118c";
+import { PUBLISHED_RESULTS, ROUND_PRIZES, SHOW_WINNERS } from "./js/config.js?v=20261118c";
 const api = await getApi();
 if (new URLSearchParams(location.search).has("embed")) { document.querySelector(".live-top").style.display = "none"; document.getElementById("slidelinks").style.display = "none"; document.body.style.background = "transparent"; }
 document.getElementById("mode").innerHTML = modeBadge(api);

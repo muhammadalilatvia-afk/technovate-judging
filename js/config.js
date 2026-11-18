@@ -43,3 +43,8 @@ export const ROUND_PRIZES = {
   2: { 1: "Certificate", 2: "Certificate", 3: "Certificate" },
   3: { 1: "1st Place", 2: "2nd Place", 3: "3rd Place" },
 };
+
+// Result appeals (appeal.html). Teams can appeal until this moment; organizers reply within APPEAL_REVIEW_DAYS.
+// The database has its own copy of the deadline in supabase/008_appeals.sql (_appeal_deadline).
+export const APPEAL_DEADLINE = "2026-11-25T23:59:59+05:00";
+export const APPEAL_REVIEW_DAYS = 7;

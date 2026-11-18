@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Appeal a result – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css?v=20261118c">
+<style>
+  textarea { width: 100%; min-height: 140px; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: inherit; resize: vertical; box-sizing: border-box; }
+  select { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0d1d45; color: inherit; width: 100%; }
+  .rules { padding-left: 20px; color: var(--muted); margin: 0; }
+  .rules li { margin: 4px 0; }
+  .ap { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: rgba(255,255,255,.04); }
+  .ap .st { font-weight: 800; }
+  .st-received { color: #93c5fd; } .st-reviewing { color: #fbbf24; } .st-accepted { color: #86efac; } .st-rejected { color: #fca5a5; }
+  .reply { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(247,147,30,.10); border: 1px solid rgba(247,147,30,.4); white-space: pre-wrap; }
+  .pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="40" height="40">
+    <span><b>AJOU TECHNOVATE</b><small>HACKATHON 3.0 · APPEALS</small></span></a>
+  <span class="spacer"></span>
+  <span id="mode"></span>
+  <img class="uni-logo" src="assets/ajou-logo.png" alt="Ajou University in Tashkent">
+</header>
+<main class="wrap" style="max-width:780px" id="app"></main>
+
+<script type="module">
+import { getApi, esc, toast, modeBadge } from "./js/common.js?v=20261118c";
+import { APPEAL_DEADLINE, APPEAL_REVIEW_DAYS } from "./js/config.js?v=20261118c";
+const api = await getApi();
+document.getElementById("mode").innerHTML = modeBadge(api);
+const app = document.getElementById("app");
+const ROUNDS = { 3: "Grand Final", 2: "Round 2", 1: "Round 1" };
+const STATUS = { received: "📨 Received", reviewing: "🔎 Under review", accepted: "✅ Accepted", rejected: "❌ Not accepted" };
+const deadline = new Date(APPEAL_DEADLINE), closed = Date.now() > deadline.getTime();
+const deadlineTxt = deadline.toLocaleString("en-GB", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tashkent" }) + " (Tashkent time)";
+const when = (t) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+let code = sessionStorage.getItem("teamCode") || "", key = sessionStorage.getItem("teamKey") || "";
+
+function intro() {
+  return `<section class="card stack" style="margin-top:30px">
+    <h2 style="margin:0">⚖️ Appeal a result</h2>
+    <p class="muted" style="margin:0">If your team believes a result was wrong — especially in the <b>Grand Final</b> — you can submit an official appeal.
+      The organizing committee and judges will reconsider it and reply <b>within ${APPEAL_REVIEW_DAYS} days</b>.</p>
+    <ul class="rules">
+      <li>Appeals are accepted until <b>${esc(deadlineTxt)}</b>.</li>
+      <li>Log in with your <b>team code</b> and <b>6-digit upload code</b> (the same codes you used to upload your presentation).</li>
+      <li>Explain clearly what you think was wrong and why. Up to 3 appeals per team.</li>
+      <li>Appeals are private: only the organizers can read them. You can come back here to see the status and the reply.</li>
+    </ul>
+  </section>`;
+}
+
+function loginView(msg = "") {
+  app.innerHTML = `${intro()}
+  <section class="card stack" style="margin-top:16px">
+    <h2 style="margin:0">Log in with your team</h2>
+    ${api.mode === "demo" ? `<p class="small"><span class="badge demo">DEMO</span> Team <b>T01</b>, upload code <b>100001</b></p>` : ""}
+    <form id="f" class="stack">
+      <div class="grid cols-2">
+        <label class="field"><span>Team code (e.g. T07)</span><input type="text" id="code" value="${esc(code)}" required autocomplete="off" style="text-transform:uppercase"></label>
+        <label class="field"><span>Upload code (6 digits, from the organizers)</span><input type="password" id="key" inputmode="numeric" required autocomplete="off"></label>
+      </div>
+      ${msg ? `<div class="toast err" style="position:static">${esc(msg)}</div>` : ""}
+      <button class="btn primary big" style="justify-content:center">Continue</button>
+    </form>
+    <p class="muted small">Lost your codes? Ask the organizers in the <a href="https://t.me/AJOUH2025" target="_blank" rel="noopener">Telegram group</a>.</p>
+  </section>`;
+  document.getElementById("f").onsubmit = async (e) => {
+    e.preventDefault();
+    const c = document.getElementById("code").value.trim().toUpperCase(), k = document.getElementById("key").value.trim();
+    try { await api.teamAppeals(c, k); code = c; key = k; sessionStorage.setItem("teamCode", c); sessionStorage.setItem("teamKey", k); teamView(); }
+    catch (err) { loginView(/function|schema cache|Could not find/i.test(err.message) ? "Appeals are not open yet. Please try again later or contact the organizers." : err.message); }
+  };
+}
+
+async function teamView(done = 0) {
+  let list = [];
+  try { list = await api.teamAppeals(code, key); } catch (err) { return loginView(err.message); }
+  app.innerHTML = `${intro()}
+  ${done ? `<div class="card" style="margin-top:16px;border-color:rgba(34,197,94,.6);background:rgba(34,197,94,.10)"><h2 style="margin:0">✅ Appeal #${done} received</h2>
+    <p class="muted" style="margin:6px 0 0">Thank you. The organizers will reconsider it and reply within ${APPEAL_REVIEW_DAYS} days. Come back to this page to see the reply.</p></div>` : ""}
+  <section class="card stack" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Team ${esc(code)}</h2><button class="btn" id="out">Log out</button></div>
+    ${closed ? `<p class="toast err" style="position:static">The appeal period ended on ${esc(deadlineTxt)}.</p>` : list.length >= 3 ? `<p class="muted">Your team has submitted 3 appeals (the maximum).</p>` : `
+    <form id="ap" class="stack">
+      <label class="field"><span>Which result are you appealing?</span>
+        <select id="round">${[3, 2, 1].map((id) => [id, ROUNDS[id]]).map(([id, n]) => `<option value="${id}">${n}</option>`).join("")}</select></label>
+      <div class="grid cols-2">
+        <label class="field"><span>Your full name</span><input type="text" id="name" required maxlength="120"></label>
+        <label class="field"><span>Phone, Telegram or email (so we can reach you)</span><input type="text" id="contact" required maxlength="160"></label>
+      </div>
+      <label class="field"><span>Reason for the appeal — what was wrong and why? (at least 20 characters)</span>
+        <textarea id="reason" required minlength="20" maxlength="3000" placeholder="e.g. Our demo could not be shown because the projector failed during our presentation…"></textarea></label>
+      <label class="field"><span>What are you asking for? (optional)</span><input type="text" id="request" maxlength="1000" placeholder="e.g. re-evaluation of our Final presentation"></label>
+      <label class="row" style="gap:10px;align-items:flex-start"><input type="checkbox" id="agree" required style="margin-top:4px"><span class="small muted">I confirm this appeal is submitted on behalf of my team and the information is true.</span></label>
+      <button class="btn primary big" style="justify-content:center" id="send">Submit appeal</button>
+    </form>`}
+  </section>
+  <section class="card stack" style="margin-top:16px">
+    <h2 style="margin:0">Your team's appeals</h2>
+    ${list.length ? list.map((a) => `<div class="ap">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap"><b>#${a.id} · ${esc(ROUNDS[a.round_id] || "")}</b><span class="st st-${esc(a.status)}">${STATUS[a.status] || esc(a.status)}</span></div>
+      <div class="muted small">Sent ${esc(when(a.created_at))}${a.updated_at !== a.created_at ? ` · updated ${esc(when(a.updated_at))}` : ""}</div>
+      <p class="pre" style="margin:8px 0 0">${esc(a.reason)}</p>${a.request ? `<p class="muted small" style="margin:6px 0 0">Request: ${esc(a.request)}</p>` : ""}
+      ${a.reply ? `<div class="reply"><b>Organizers' reply:</b>\n${esc(a.reply)}</div>` : ""}</div>`).join("") : `<p class="muted">No appeals yet.</p>`}
+  </section>`;
+  document.getElementById("out").onclick = () => { sessionStorage.removeItem("teamKey"); key = ""; loginView(); };
+  const f = document.getElementById("ap");
+  if (f) f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("send"); btn.disabled = true;
+    const v = (id) => document.getElementById(id).value.trim();
+    try {
+      const id = await api.submitAppeal(code, key, { round: Number(v("round")), name: v("name"), contact: v("contact"), reason: v("reason"), request: v("request") });
+      teamView(id); window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) { toast(err.message, "err"); btn.disabled = false; }
+  };
+}
+
+code && key ? teamView() : loginView();
+</script>
+</body>
+</html>

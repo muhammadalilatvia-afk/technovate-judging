@@ -104,6 +104,12 @@
       <p class="muted" style="margin:4px 0 0">Round 1 winners first, then the Grand Final winners — revealed 3rd, 2nd, 1st.</p></div>
     <span class="btn primary" style="margin-left:auto">Show ▶</span></a>
 
+  <a class="card tile" href="appeal.html" style="margin-top:14px;display:flex;gap:18px;align-items:center">
+    <div class="ico">⚖️</div>
+    <div><h2 style="margin:0">Appeal a result</h2>
+      <p class="muted" style="margin:4px 0 0">Teams who disagree with a result — especially the Grand Final — can submit an appeal. We reconsider and reply within 1 week.</p></div>
+    <span class="btn" style="margin-left:auto">Appeal ▶</span></a>
+
   <section class="grid" style="margin-top:20px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
     <a class="card tile" href="results.html" style="border-color:rgba(247,147,30,.55)"><div class="ico">🏆</div><h2>Results</h2>
       <p class="muted">Winners and the teams that qualified for the next round.</p></a>
@@ -132,7 +138,7 @@
   <p class="muted small" style="text-align:center;margin-top:30px">Ajou University in Tashkent · Open-source judging system · <a href="https://t.me/AJOUH2025">Telegram</a></p>
 </main>
 <script type="module">
-  import { getApi, modeBadge } from "./js/common.js?v=20261118b";
+  import { getApi, modeBadge } from "./js/common.js?v=20261118c";
   const api = await getApi();
   document.getElementById("mode").innerHTML = modeBadge(api) || '<span class="badge ok">LIVE DATABASE</span>';
 </script>

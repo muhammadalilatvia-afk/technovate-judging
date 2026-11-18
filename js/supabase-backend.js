@@ -57,6 +57,12 @@ export function supabaseBackend(url, key) {
     adminPresentations: (pin) => rpc("admin_presentations", { p_pin: pin }),
     adminActivity: (pin, limit = 25) => rpc("admin_activity", { p_pin: pin, p_limit: limit }),
 
+    // appeals (supabase/008_appeals.sql)
+    submitAppeal: (code, key, a) => rpc("submit_appeal", { p_code: code, p_key: key, p_round: a.round, p_name: a.name, p_contact: a.contact, p_reason: a.reason, p_request: a.request || "" }),
+    teamAppeals: (code, key) => rpc("team_appeals", { p_code: code, p_key: key }),
+    adminAppeals: (pin) => rpc("admin_appeals", { p_pin: pin }),
+    adminUpdateAppeal: (pin, id, status, reply) => rpc("admin_update_appeal", { p_pin: pin, p_id: id, p_status: status, p_reply: reply || "" }),
+
     adminClearPhoto: (pin, teamId) => rpc("admin_clear_photo", { p_pin: pin, p_team: teamId }),
 
     // presentations + team photos

@@ -163,6 +163,31 @@ export const demoBackend = {
   adminStatus: () => delay({ configured: true }),
   adminSetup: () => delay(false),
   adminCheck: (pin) => delay(pin === ADMIN_PIN),
+  // appeals (demo: stored in localStorage)
+  submitAppeal(code, key, a) {
+    const db = load(), t = db.teams.find((x) => x.code.toUpperCase() === code.trim().toUpperCase() && x.upload_key === key.trim());
+    if (!t) throw new Error("Wrong team code or upload code");
+    if (String(a.reason || "").trim().length < 20) throw new Error("Please explain the reason (at least 20 characters)");
+    db.appeals ??= [];
+    if (db.appeals.filter((x) => x.team_id === t.id).length >= 3) throw new Error("Your team has already submitted 3 appeals. Please contact the organizers.");
+    const id = (db.appeals.at(-1)?.id || 0) + 1, now = new Date().toISOString();
+    db.appeals.push({ id, team_id: t.id, round_id: a.round, name: a.name, contact: a.contact, reason: a.reason, request: a.request || "", status: "received", reply: "", created_at: now, updated_at: now });
+    save(db); return delay(id);
+  },
+  teamAppeals(code, key) {
+    const db = load(), t = db.teams.find((x) => x.code.toUpperCase() === code.trim().toUpperCase() && x.upload_key === key.trim());
+    if (!t) throw new Error("Wrong team code or upload code");
+    return delay((db.appeals || []).filter((x) => x.team_id === t.id).reverse());
+  },
+  adminAppeals(pin) {
+    needAdmin(pin); const db = load();
+    return delay((db.appeals || []).map((a) => { const t = db.teams.find((x) => x.id === a.team_id) || {}; return { ...a, code: t.code, project: t.project }; }).reverse());
+  },
+  adminUpdateAppeal(pin, id, status, reply) {
+    needAdmin(pin); const db = load(), a = (db.appeals || []).find((x) => x.id === id);
+    if (a) Object.assign(a, { status, reply: reply || "", updated_at: new Date().toISOString() });
+    save(db); return delay();
+  },
   adminChangePin() { throw new Error("In demo mode the admin PIN is always 0000"); },
   adminSetState(pin, patch) { needAdmin(pin); const db = load(); Object.assign(db.state, patch); save(db); return delay(); },
   adminImportTeams(pin, rows, replace) {

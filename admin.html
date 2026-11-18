@@ -37,7 +37,7 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261118b";
+import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261118c";
 import { openCertificates } from "./js/certificates.js?v=20261118a";
 import { JUDGE_PANELS, JUDGE_ROSTER } from "./js/config.js?v=20261118a";
 const api = await getApi();
@@ -161,18 +161,19 @@ async function load() {
     api.adminListJudges(pin),
   ]);
   const [progress, pres, activity, rstatus, picks] = await Promise.all([api.getJudgeProgress(), api.adminPresentations(pin), api.adminActivity(pin, 30), api.getRoundStatus ? api.getRoundStatus().catch(() => []) : [], api.getPicks ? api.getPicks().catch(() => null) : null]);
-  return { st, teams, boards: Object.fromEntries(rounds.map((r, i) => [r.id, boards[i]])), judges, progress, pres, activity, rstatus, picks };
+  const appeals = api.adminAppeals ? await api.adminAppeals(pin).catch(() => null) : null;  // null = 008_appeals.sql not run yet
+  return { st, teams, boards: Object.fromEntries(rounds.map((r, i) => [r.id, boards[i]])), judges, progress, pres, activity, rstatus, picks, appeals };
 }
 
 // -------------------------------------------------------------- rendering --
 async function render() {
   const D = await load();
   const up = D.pres.filter((p) => p.file_name).length;
-  const tabs = [["dashboard", "Dashboard"], ["control", "Event control"], ["presentations", `Presentations (${up}/${D.pres.length})`], ["teams", `Teams (${D.teams.length})`], ["rounds", "Rounds & line-ups"], ["judges", `Judges (${D.judges.filter((j) => j.active).length})`], ["results", "Results & export"]];
+  const tabs = [["dashboard", "Dashboard"], ["control", "Event control"], ["presentations", `Presentations (${up}/${D.pres.length})`], ["teams", `Teams (${D.teams.length})`], ["rounds", "Rounds & line-ups"], ["judges", `Judges (${D.judges.filter((j) => j.active).length})`], ["results", "Results & export"], ["appeals", `⚖️ Appeals${(D.appeals || []).filter((a) => a.status === "received").length ? ` (${D.appeals.filter((a) => a.status === "received").length} new)` : ""}`]];
   app.innerHTML = `<div class="tabs noprint">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div><div id="pane"></div>`;
   app.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { showKeys = false; tab = b.dataset.tab; sessionStorage.setItem("adminTab", tab); render(); });
   const pane = document.getElementById("pane");
-  ({ dashboard, control, presentations: presentationsPane, teams: teamsPane, rounds: roundsPane, judges: judgesPane, results })[tab](pane, D);
+  ({ dashboard, control, presentations: presentationsPane, teams: teamsPane, rounds: roundsPane, judges: judgesPane, results, appeals: appealsPane })[tab](pane, D);
 }
 
 // --------------------------------------------------------- round banner --
@@ -458,6 +459,36 @@ function teamsPane(pane, { teams, st, boards }) {
   pane.querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => {
     if (!confirm("Delete this team and all its scores?")) return;
     await run(() => api.adminDeleteTeam(pin, Number(b.dataset.del)), "Team deleted"); render();
+  });
+}
+
+// ---------------------------------------------------------------- appeals --
+function appealsPane(pane, { appeals }) {
+  const RN = { 1: "Round 1", 2: "Round 2", 3: "Grand Final" };
+  const ST = [["received", "📨 Received"], ["reviewing", "🔎 Under review"], ["accepted", "✅ Accepted"], ["rejected", "❌ Not accepted"]];
+  if (appeals === null) {
+    pane.innerHTML = `<section class="card stack"><h2>⚖️ Appeals are not switched on yet</h2>
+      <p>Run <code>supabase/008_appeals.sql</code> once in Supabase → SQL Editor, then reload this page.</p>
+      <p class="muted small">Teams submit appeals on <a href="appeal.html" target="_blank">appeal.html ↗</a> with their team code + upload code.</p></section>`;
+    return;
+  }
+  const when = (t) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  pane.innerHTML = `<section class="card stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0">⚖️ Appeals (${appeals.length})</h2><a class="btn" href="appeal.html" target="_blank">Appeal page ↗</a></div>
+    <p class="muted small" style="margin:0">Teams see the status and your reply on the appeal page. Reply within 7 days.</p>
+    ${appeals.length ? appeals.map((a) => `<div class="card" style="background:rgba(255,255,255,.04)">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><b>#${a.id} · ${esc(a.code)} · ${esc(a.project)} — ${esc(RN[a.round_id] || "")}</b>
+        <span class="muted small">${esc(when(a.created_at))}</span></div>
+      <div class="small">From <b>${esc(a.name)}</b> · ${esc(a.contact)}</div>
+      <p style="white-space:pre-wrap;margin:8px 0">${esc(a.reason)}</p>${a.request ? `<p class="muted small" style="margin:0 0 8px">Request: ${esc(a.request)}</p>` : ""}
+      <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-start">
+        <select data-st="${a.id}" style="font:inherit;padding:8px;border-radius:8px;background:#0d1d45;color:inherit;border:1px solid var(--line)">${ST.map(([k, l]) => `<option value="${k}" ${a.status === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+        <textarea data-reply="${a.id}" placeholder="Reply to the team (they will see it)" style="flex:1;min-width:240px;min-height:60px;font:inherit;padding:8px;border-radius:8px;background:rgba(255,255,255,.06);color:inherit;border:1px solid var(--line)">${esc(a.reply)}</textarea>
+        <button class="btn primary" data-save="${a.id}">Save</button></div></div>`).join("") : `<p class="muted">No appeals yet.</p>`}</section>`;
+  pane.querySelectorAll("[data-save]").forEach((b) => b.onclick = async () => {
+    const id = Number(b.dataset.save);
+    await run(() => api.adminUpdateAppeal(pin, id, pane.querySelector(`[data-st="${id}"]`).value, pane.querySelector(`[data-reply="${id}"]`).value), `Appeal #${id} saved`);
+    render();
   });
 }
 
