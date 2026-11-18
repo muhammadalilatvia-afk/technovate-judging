@@ -53,6 +53,10 @@ async function render() {
                            : `<b>🏆 FINAL COMPLETE</b> Congratulations to all winners!`)
     : next ?`<b>NEXT UP</b> ${esc(next.code)} · ${esc(next.project)}` : `<b>${esc(round.name)}</b> ${esc(round.description)}`;
 
+  if (st.view === "qualified") {   // Results screen (qualified teams) shown full size on the main screen
+    setScreen(`<iframe src="results.html?embed=1${api.mode === "demo" ? "&demo" : ""}" title="Results" style="border:0;width:100%;height:calc(100vh - 92px - 58px);display:block;background:transparent"></iframe>`);
+    return;
+  }
   if (st.view === "welcome") {
     setScreen(`<div class="center-screen">
       <img src="assets/technovate-mark.svg" width="230" alt="" class="reveal">

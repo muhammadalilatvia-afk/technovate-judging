@@ -45,6 +45,7 @@
 import { getApi, esc, fmt, rank, modeBadge, clock, avatar } from "./js/common.js?v=20261118b";
 import { PUBLISHED_RESULTS, ROUND_PRIZES, SHOW_WINNERS } from "./js/config.js?v=20261118b";
 const api = await getApi();
+if (new URLSearchParams(location.search).has("embed")) { document.querySelector(".live-top").style.display = "none"; document.body.style.background = "transparent"; }
 document.getElementById("mode").innerHTML = modeBadge(api);
 clock(document.getElementById("clock"));
 const rounds = await api.getRounds();
