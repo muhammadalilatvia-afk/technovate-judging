@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Organizer – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261117c">
+<link rel="stylesheet" href="assets/app.css?v=20261118a">
 <style>
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
   .tabs button { border: 1px solid var(--line); background: rgba(255,255,255,.05); padding: 9px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; }
@@ -36,9 +36,9 @@
 <main class="wrap" id="app"></main>
 
 <script type="module">
-import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261117c";
-import { openCertificates } from "./js/certificates.js?v=20261117c";
-import { JUDGE_PANELS, JUDGE_ROSTER } from "./js/config.js?v=20261117c";
+import { getApi, esc, fmt, rank, toast, modeBadge, teamsFromCsv, toCsv, download, fmtSize, fmtTime, avatar } from "./js/common.js?v=20261118a";
+import { openCertificates } from "./js/certificates.js?v=20261118a";
+import { JUDGE_PANELS, JUDGE_ROSTER } from "./js/config.js?v=20261118a";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");
@@ -159,8 +159,8 @@ async function load() {
     Promise.all(rounds.map((r) => api.getLeaderboard(r.id))),
     api.adminListJudges(pin),
   ]);
-  const [progress, pres, activity, rstatus] = await Promise.all([api.getJudgeProgress(), api.adminPresentations(pin), api.adminActivity(pin, 30), api.getRoundStatus ? api.getRoundStatus().catch(() => []) : []]);
-  return { st, teams, boards: Object.fromEntries(rounds.map((r, i) => [r.id, boards[i]])), judges, progress, pres, activity, rstatus };
+  const [progress, pres, activity, rstatus, picks] = await Promise.all([api.getJudgeProgress(), api.adminPresentations(pin), api.adminActivity(pin, 30), api.getRoundStatus ? api.getRoundStatus().catch(() => []) : [], api.getPicks ? api.getPicks().catch(() => null) : null]);
+  return { st, teams, boards: Object.fromEntries(rounds.map((r, i) => [r.id, boards[i]])), judges, progress, pres, activity, rstatus, picks };
 }
 
 // -------------------------------------------------------------- rendering --
@@ -437,16 +437,19 @@ function teamsPane(pane, { teams, st, boards }) {
 }
 
 // ----------------------------------------------------------------- rounds --
-function roundsPane(pane, { teams, boards }) {
+function roundsPane(pane, { teams, boards, picks }) {
   const byId = Object.fromEntries(teams.map((t) => [t.id, t]));
   const r1 = rank(boards[1]).filter((r) => r.judges > 0), r2 = rank(boards[2]).filter((r) => r.judges > 0);
+  const picked = (rid) => (picks || []).filter((p) => p.round_id === rid && byId[p.team_id]).map((p) => p.team_id);
+  const withPicks = (rid, ids) => [...ids, ...picked(rid).filter((id) => !ids.includes(id))];
+  const prevInfo = (rid, id) => { const r = (rid === 2 ? r1 : r2).find((x) => x.team_id === id); return r ? ` · ${rounds[rid - 2].name} #${r.rank} (${fmt(r.score)})` : (rid === 2 && !byId[id]?.round1 ? " · skips Round 1" : ""); };
   const plans = {
     1: { label: "All Round-1 teams (IT Business 3rd year), by team code", ids: () => teams.filter((t) => t.round1).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })).map((t) => t.id) },
     2: { label: `Top ${rounds[0].qualify_top} of Round 1 + all teams that skip Round 1`, ids: () => {
       const q = r1.filter((r) => r.rank <= rounds[0].qualify_top).map((r) => r.team_id);
       const others = teams.filter((t) => !t.round1 && !q.includes(t.id)).map((t) => t.id);
-      return [...q, ...others]; } },
-    3: { label: `Top ${rounds[1].qualify_top} of Round 2`, ids: () => r2.filter((r) => r.rank <= rounds[1].qualify_top).map((r) => r.team_id) },
+      return withPicks(2, [...q, ...others]); } },
+    3: { label: `Top ${rounds[1].qualify_top} of Round 2`, ids: () => withPicks(3, r2.filter((r) => r.rank <= rounds[1].qualify_top).map((r) => r.team_id)) },
   };
   pane.innerHTML = `<div class="grid cols-3">${rounds.map((r) => {
     const lineup = [...boards[r.id]].sort((a, b) => a.position - b.position);
@@ -457,8 +460,35 @@ function roundsPane(pane, { teams, boards }) {
       <p class="muted small">${plans[r.id].label}${r.id > 1 && !(r.id === 2 ? r1 : r2).length ? " — previous round has no scores yet." : ""}</p>
       <button class="btn" data-shuffle="${r.id}" ${lineup.length < 2 ? "disabled" : ""}>🔀 Random presentation order</button>
       ${scored ? `<p class="small" style="color:#fca5a5">${scored} teams already have scores in this round. Rebuilding keeps their scores.</p>` : ""}
-      <ol class="small" style="max-height:340px;overflow:auto;padding-left:22px">${lineup.map((t) => `<li><b>${esc(t.code)}</b> ${esc(byId[t.team_id]?.project || "")}</li>`).join("")}</ol>
+      ${r.id > 1 ? (() => {
+        const inL = new Set(lineup.map((t) => t.team_id)), prev = r.id === 2 ? r1 : r2;
+        const pool = [...teams].filter((t) => !inL.has(t.id)).sort((a, b) => {
+          const ra = prev.find((x) => x.team_id === a.id)?.rank ?? 999, rb = prev.find((x) => x.team_id === b.id)?.rank ?? 999;
+          return ra - rb || a.code.localeCompare(b.code, undefined, { numeric: true }); });
+        return `<div class="stack" style="border:1px dashed rgba(247,147,30,.6);border-radius:10px;padding:10px">
+          <b>⭐ Pick a team for ${esc(r.name)}</b>
+          <p class="muted small" style="margin:0">Add any team (e.g. a wildcard from ${esc(rounds[r.id - 2].name)}), even if it did not qualify. Picked teams stay in the line-up when it is rebuilt automatically.</p>
+          ${picks === null && api.mode !== "demo" ? `<p class="small" style="color:#fca5a5;margin:0">Run <b>supabase/007_pick_teams.sql</b> once in Supabase so picks are kept after Round 1 finishes.</p>` : ""}
+          <select data-pickfrom="${r.id}" ${pool.length ? "" : "disabled"}><option value="">${pool.length ? "Choose a team…" : "All teams are already in this round"}</option>${pool.map((t) => `<option value="${t.id}">${esc(t.code)} · ${esc(t.project)}${prevInfo(r.id, t.id)}</option>`).join("")}</select>
+          <button class="btn primary" data-pick="${r.id}" ${pool.length ? "" : "disabled"}>➕ Add to ${esc(r.name)}</button></div>`; })() : ""}
+      <ol class="small" style="max-height:340px;overflow:auto;padding-left:22px">${lineup.map((t) => `<li><b>${esc(t.code)}</b> ${esc(byId[t.team_id]?.project || "")}${r.id > 1 && picked(r.id).includes(t.team_id) ? ` <span class="badge" style="background:rgba(247,147,30,.25);color:#fdba74">⭐ picked</span> <button class="btn" style="padding:0 8px;font-size:12px" data-unpick="${r.id}" data-team="${t.team_id}" title="Remove from ${esc(r.name)}">✕</button>` : ""}</li>`).join("")}</ol>
     </section>`; }).join("")}</div>`;
+  const savePicks = async (rid, ids, lineupIds, msg) => {
+    if (api.adminSetPicks && picks !== null) return run(() => api.adminSetPicks(pin, rid, ids), msg);
+    return run(() => api.adminSetRoundTeams(pin, rid, lineupIds), msg);   // database not updated yet: change the line-up directly
+  };
+  pane.querySelectorAll("[data-pick]").forEach((b) => b.onclick = async () => {
+    const rid = Number(b.dataset.pick), sel = pane.querySelector(`[data-pickfrom="${rid}"]`), id = Number(sel.value);
+    if (!id) return toast("Choose a team first", "err");
+    const lineupIds = [...boards[rid]].sort((a, c) => a.position - c.position).map((t) => t.team_id);
+    await savePicks(rid, [...picked(rid), id], [...lineupIds, id], `${byId[id].code} added to ${rounds[rid - 1].name} ⭐`); render();
+  });
+  pane.querySelectorAll("[data-unpick]").forEach((b) => b.onclick = async () => {
+    const rid = Number(b.dataset.unpick), id = Number(b.dataset.team), t = boards[rid].find((x) => x.team_id === id);
+    if (!confirm(`Remove ${byId[id].code} from ${rounds[rid - 1].name}?${t?.judges ? " Its scores in this round are kept but it leaves the line-up." : ""}`)) return;
+    const lineupIds = [...boards[rid]].sort((a, c) => a.position - c.position).map((x) => x.team_id).filter((x) => x !== id);
+    await savePicks(rid, picked(rid).filter((x) => x !== id), lineupIds, `${byId[id].code} removed from ${rounds[rid - 1].name}`); render();
+  });
   pane.querySelectorAll("[data-build]").forEach((b) => b.onclick = async () => {
     const id = Number(b.dataset.build), ids = plans[id].ids();
     if (!ids.length) return toast("No teams match. Check the Teams tab or the previous round's scores.", "err");

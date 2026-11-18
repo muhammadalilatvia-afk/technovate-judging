@@ -52,6 +52,7 @@ function load() {
   let db;
   try { db = JSON.parse(localStorage.getItem(KEY)) || fresh(); } catch { db = fresh(); }
   db.presentations ??= [];
+  db.picks ??= [];
   db.state.uploads_open ??= true;
   db.teams.forEach((t) => { t.upload_key ??= demoKey(t.id); });
   return db;
@@ -89,6 +90,7 @@ function autoAdvance(db) {
   for (const r of [1, 2]) {
     if (!roundComplete(db, r) || db.scores.some((s) => s.round_id === r + 1)) continue;
     let ids = ranked(db, r).slice(0, ROUNDS[r - 1].qualify_top).map((x) => x.id);
+    ids = ids.concat(db.picks.filter((p) => p.round_id === r + 1 && !ids.includes(p.team_id)).map((p) => p.team_id).sort((a, b) => a - b));
     if (r === 1) ids = ids.concat(db.teams.filter((t) => !t.round1 && !ids.includes(t.id)).sort((a, b) => a.code.localeCompare(b.code)).map((t) => t.id));
     db.round_teams = db.round_teams.filter((x) => x.round_id !== r + 1).concat(ids.map((id, i) => ({ round_id: r + 1, team_id: id, position: i + 1 })));
   }
@@ -178,6 +180,17 @@ export const demoBackend = {
     db.teams = db.teams.filter((t) => t.id !== id); db.round_teams = db.round_teams.filter((r) => r.team_id !== id);
     db.scores = db.scores.filter((s) => s.team_id !== id); if (db.state.current_team_id === id) db.state.current_team_id = null;
     save(db); return delay();
+  },
+  getPicks() { return delay(load().picks); },
+  adminSetPicks(pin, round, ids) {
+    needAdmin(pin); const db = load();
+    if (![2, 3].includes(round)) throw new Error("Teams can only be picked for Round 2 or the Final");
+    const old = db.picks.filter((p) => p.round_id === round).map((p) => p.team_id);
+    db.round_teams = db.round_teams.filter((x) => !(x.round_id === round && old.includes(x.team_id) && !ids.includes(x.team_id)));
+    db.picks = db.picks.filter((p) => p.round_id !== round).concat(ids.map((id) => ({ round_id: round, team_id: id })));
+    let pos = Math.max(0, ...db.round_teams.filter((x) => x.round_id === round).map((x) => x.position));
+    for (const id of ids) if (!db.round_teams.some((x) => x.round_id === round && x.team_id === id)) db.round_teams.push({ round_id: round, team_id: id, position: ++pos });
+    save(db); return delay(ids.length);
   },
   adminSetRoundTeams(pin, round, ids) {
     needAdmin(pin); const db = load();
