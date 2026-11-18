@@ -20,7 +20,7 @@ create table public.rounds (
   description text not null default ''
 );
 insert into public.rounds values
-  (1, 'Round 1', 20, 3,  'IT Business 3rd-year teams · Top 20 qualify · Top 3 win Round 1 prizes'),
+  (1, 'Round 1', 15, 3,  'IT Business 3rd-year teams · Top 15 qualify · Top 3 win Round 1 prizes'),
   (2, 'Round 2', 5,  10, 'All Ajou University teams · Top 10 get certificates · Top 5 go to the Final'),
   (3, 'Final',   3,  3,  'Top 5 teams compete for 1st, 2nd and 3rd place');
 

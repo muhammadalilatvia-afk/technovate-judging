@@ -66,7 +66,7 @@ The anon key is meant to be public. Reading is limited to teams, line-ups and ag
 | Team walks on stage | **Put on stage** (or *Next team ▶*) — every judge screen switches to that team |
 | Presentation ends | **Scoring: open** — judges submit; the live screen ticks each judge off |
 | All judges scored | Live screen reveals the team's score and rank. Click *Next team ▶* |
-| Round 1 finished | Automatic: when every team has every judge's score, the top 20 + teams that skip Round 1 move into Round 2. Click **▶ Start Round 2** in the green banner |
+| Round 1 finished | Automatic: when every team has every judge's score, the top 15 + teams that skip Round 1 move into Round 2. Click **▶ Start Round 2** in the green banner |
 | Round 2 finished | Automatic: the top 5 move into the Final. Click **▶ Start Final** |
 | Awards | Live screen view **Winners** shows the podium. Use *Scores visible: hidden* to keep results secret until the reveal |
 | After each round | Results tab → download **Ranking CSV**, **All judge scores CSV** and the **Full backup (JSON)** |
@@ -87,7 +87,7 @@ A team's score = average of the judges' totals, scaled to 100. Ties are broken b
 
 | Round | Award |
 | --- | --- |
-| Round 1 (IT Business 3rd year) | 1st: 600,000 UZS + certificate · 2nd: 300,000 UZS + certificate · 3rd: certificate · top 20 qualify |
+| Round 1 (IT Business 3rd year) | 1st: 600,000 UZS + certificate · 2nd: 300,000 UZS + certificate · 3rd: certificate · top 15 qualify |
 | Round 2 (all Ajou teams) | Top 10: certificate · top 5 qualify for the Final |
 | Final | 1st: cash prize + certificate + gift · 2nd and 3rd: certificate + gift |
 

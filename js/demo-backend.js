@@ -7,7 +7,7 @@ const channel = "BroadcastChannel" in window ? new BroadcastChannel(KEY) : null;
 const ADMIN_PIN = "0000";
 
 const ROUNDS = [
-  { id: 1, name: "Round 1", qualify_top: 20, award_top: 3, description: "IT Business 3rd-year teams · Top 20 qualify · Top 3 win Round 1 prizes" },
+  { id: 1, name: "Round 1", qualify_top: 15, award_top: 3, description: "IT Business 3rd-year teams · Top 15 qualify · Top 3 win Round 1 prizes" },
   { id: 2, name: "Round 2", qualify_top: 5, award_top: 10, description: "All Ajou University teams · Top 10 get certificates · Top 5 go to the Final" },
   { id: 3, name: "Final", qualify_top: 3, award_top: 3, description: "Top 5 teams compete for 1st, 2nd and 3rd place" },
 ];
