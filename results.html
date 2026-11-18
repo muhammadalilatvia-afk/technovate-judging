@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Results – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css?v=20261118b">
+<style>
+  body.res { min-height: 100vh; }
+  .res-wrap { padding: 22px 34px 30px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .res-title { font-size: clamp(34px, 4.4vw, 60px); font-weight: 900; margin: 0; text-align: center; }
+  .res-title span { color: var(--orange); }
+  .tabs-r { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .tabs-r button { font: inherit; font-weight: 800; font-size: 18px; padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: inherit; cursor: pointer; }
+  .tabs-r button.on { background: var(--orange); color: #1a1205; border-color: var(--orange); }
+  .podium { width: min(1250px, 94vw); }
+  .pod .prize { margin-top: 10px; display: inline-block; font-weight: 800; font-size: 20px; padding: 6px 14px; border-radius: 10px; background: rgba(247,147,30,.18); color: #fdba74; }
+  .pod .proj { font-size: clamp(20px, 2.1vw, 30px); }
+  .pod .muted { font-size: 16px; }
+  .q-head { font-size: clamp(24px, 2.4vw, 34px); font-weight: 900; margin: 10px 0 0; text-align: center; }
+  .q-head span { color: #86efac; }
+  .q-grid { width: min(1400px, 96vw); display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+  .q { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.06); border: 1px solid var(--line); }
+  .q .rk { font-size: 24px; font-weight: 900; color: var(--orange); width: 38px; text-align: center; }
+  .q .t { min-width: 0; flex: 1; } .q .t b { display: block; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .q .t small { color: var(--muted); font-size: 14px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .q .sc { font-weight: 800; font-size: 19px; }
+  .empty { font-size: 28px; color: var(--muted); padding: 80px 0; text-align: center; }
+  @media (max-width: 700px) { .podium { grid-template-columns: 1fr; } .pod.p1 { order: -1; } .pod { min-height: 0 !important; } .res-wrap { padding: 16px; } }
+</style>
+</head>
+<body class="res">
+<header class="live-top">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="54" height="54">
+    <span><b style="font-size:24px">AJOU TECHNOVATE</b><small style="font-size:13px">HACKATHON 3.0 · RESULTS</small></span></a>
+  <span class="spacer" style="flex:1"></span>
+  <span id="mode"></span>
+  <div class="clock" id="clock"></div>
+  <img class="uni-logo" src="assets/ajou-logo.png" alt="" style="width:54px;height:54px">
+</header>
+<main class="res-wrap" id="screen"></main>
+
+<script type="module">
+import { getApi, esc, fmt, rank, modeBadge, clock, avatar } from "./js/common.js?v=20261118b";
+import { PUBLISHED_RESULTS, ROUND_PRIZES, SHOW_WINNERS } from "./js/config.js?v=20261118b";
+const api = await getApi();
+document.getElementById("mode").innerHTML = modeBadge(api);
+clock(document.getElementById("clock"));
+const rounds = await api.getRounds();
+const published = rounds.filter((r) => PUBLISHED_RESULTS.includes(r.id));
+let sel = Number(new URLSearchParams(location.search).get("round")) || published.at(-1)?.id;
+const screen = document.getElementById("screen");
+
+async function draw() {
+  if (!published.length) { screen.innerHTML = `<h1 class="res-title">Results <span>coming soon</span></h1><p class="empty">Results will be announced at the awards ceremony.</p>`; return; }
+  const round = published.find((r) => r.id === sel) || published.at(-1);
+  const ranked = rank(await api.getLeaderboard(round.id)).filter((r) => r.judges > 0);
+  const nextName = rounds.find((r) => r.id === round.id + 1)?.name;
+  const prize = ROUND_PRIZES[round.id] || {};
+  const top = ranked.slice(0, 3);
+  const pod = (r, p) => r ? `<div class="pod p${p}">
+      <div class="place">${["🥇", "🥈", "🥉"][p - 1]}</div>${avatar(api, r, p === 1 ? 150 : 115, "sq pod-photo")}<div class="code badge orange">${esc(r.code)}</div>
+      <div class="proj">${esc(r.project)}</div><div class="muted">${esc(r.members)}</div>
+      <div class="score">${fmt(r.score)} / 100</div>${prize[p] ? `<div class="prize">${esc(prize[p])}</div>` : ""}</div>` : `<div></div>`;
+  const winners = SHOW_WINNERS.includes(round.id);
+  let q = round.id < 3 ? ranked.slice(0, round.qualify_top) : [];
+  if (!winners) q = [...q].sort((a, b) => String(a.code).localeCompare(String(b.code), undefined, { numeric: true }));
+  screen.innerHTML = `
+    ${published.length > 1 ? `<div class="tabs-r">${published.map((r) => `<button data-r="${r.id}" class="${r.id === round.id ? "on" : ""}">${esc(r.name)}</button>`).join("")}</div>` : ""}
+    ${winners ? `<h1 class="res-title">🏆 ${esc(round.name)} <span>Winners</span></h1>
+    ${ranked.length ? `<div class="podium">${pod(top[1], 2)}${pod(top[0], 1)}${pod(top[2], 3)}</div>` : `<p class="empty">No results yet.</p>`}` : `<h1 class="res-title">${esc(round.name)} · <span>Top ${q.length} teams</span></h1>
+    <p class="muted" style="font-size:22px;margin:-8px 0 0;text-align:center">qualified for ${esc(nextName)} — congratulations! · winners are announced at the awards ceremony</p>`}
+    ${q.length ? `${winners ? `<h2 class="q-head">✅ Top ${q.length} <span>qualified for ${esc(nextName)}</span></h2>` : ""}
+      <div class="q-grid">${q.map((r) => `<div class="q">${winners ? `<div class="rk">${r.rank}</div>` : `<div class="rk">✅</div>`}${avatar(api, r, 46)}
+        <div class="t"><b>${esc(r.code)} · ${esc(r.project)}</b><small>${esc(r.members)}</small></div>${winners ? `<div class="sc">${fmt(r.score)}</div>` : ""}</div>`).join("")}</div>` : ""}`;
+  screen.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => { sel = Number(b.dataset.r); history.replaceState(null, "", `?round=${sel}${api.mode === "demo" ? "&demo" : ""}`); draw(); });
+}
+await draw();
+let t; api.subscribe(() => { clearTimeout(t); t = setTimeout(draw, 400); });
+document.addEventListener("keydown", (e) => { if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); });
+</script>
+</body>
+</html>

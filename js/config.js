@@ -33,3 +33,13 @@ export const JUDGE_PANELS = {
   3: ["Dr Sajid Khan", "Dr Adnan Manzoor", "Dr Muhammad Bilal", AI_JUDGE],
 };
 export const JUDGE_ROSTER = [...new Set([...JUDGE_PANELS[1], ...JUDGE_PANELS[2], ...JUDGE_PANELS[3]])];
+
+// Rounds whose results are shown on results.html (Results screen). Add 2 / 3 when they are announced.
+export const PUBLISHED_RESULTS = [1];
+// Rounds where the winners podium + scores are shown. Until then only the qualified teams are listed (by team code, no scores).
+export const SHOW_WINNERS = [];
+export const ROUND_PRIZES = {
+  1: { 1: "600,000 UZS + Certificate", 2: "300,000 UZS + Certificate", 3: "Certificate" },
+  2: { 1: "Certificate", 2: "Certificate", 3: "Certificate" },
+  3: { 1: "1st Place", 2: "2nd Place", 3: "3rd Place" },
+};
