@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Awards – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css?v=20261118b">
+<style>
+  body.aw { min-height: 100vh; }
+  .aw-wrap { padding: 18px 30px 26px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .aw-title { font-size: clamp(36px, 4.6vw, 66px); font-weight: 900; margin: 0; text-align: center; }
+  .aw-title span { color: var(--orange); }
+  .aw-sub { font-size: 22px; color: var(--muted); margin: -8px 0 0; text-align: center; }
+  .podium { width: min(1300px, 94vw); }
+  .pod { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .pod .proj { font-size: clamp(22px, 2.2vw, 32px); }
+  .pod .muted { font-size: 16px; }
+  .pod .prize { margin-top: 10px; display: inline-block; font-weight: 800; font-size: 20px; padding: 6px 14px; border-radius: 10px; background: rgba(247,147,30,.18); color: #fdba74; }
+  .pod.closed { background: rgba(255,255,255,.04); border-style: dashed; }
+  .pod.closed .q { font-size: 120px; font-weight: 900; color: rgba(255,255,255,.18); line-height: 1; }
+  .pod.closed .lbl { font-size: 24px; font-weight: 800; color: var(--muted); margin-top: 10px; }
+  .pod.new { animation: pop .9s cubic-bezier(.2,1.4,.4,1) both; }
+  .pod.p1.open.new { box-shadow: 0 0 0 6px rgba(251,191,36,.25), 0 0 80px rgba(251,191,36,.45); }
+  .ctl { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .ctl .btn { font-size: 18px; padding: 12px 20px; }
+  .ctl .btn.on { background: var(--orange); color: #1a1205; border-color: var(--orange); }
+  .empty { font-size: 28px; color: var(--muted); padding: 60px 0; text-align: center; }
+  .confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+  .confetti i { position: absolute; top: -20px; width: 10px; height: 16px; border-radius: 2px; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+  body.embed .live-top, body.embed .ctl { display: none !important; }
+  body.embed { background: transparent; }
+  @media (max-width: 700px) { .podium { grid-template-columns: 1fr; } .pod.p1 { order: -1; } .pod { min-height: 0 !important; } .aw-wrap { padding: 16px; } }
+</style>
+</head>
+<body class="aw">
+<header class="live-top">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="54" height="54">
+    <span><b style="font-size:24px">AJOU TECHNOVATE</b><small style="font-size:13px">HACKATHON 3.0 · AWARDS</small></span></a>
+  <span class="spacer" style="flex:1"></span>
+  <span id="mode"></span>
+  <img class="uni-logo" src="assets/ajou-logo.png" alt="" style="width:54px;height:54px">
+</header>
+<main class="aw-wrap">
+  <div class="ctl" id="tabs"></div>
+  <div id="screen" style="display:contents"></div>
+  <div class="ctl" id="ctl"></div>
+</main>
+<div class="confetti" id="confetti"></div>
+
+<script type="module">
+// Awards ceremony: reveal 3rd → 2nd → 1st place, for Round 1 and the Final.
+// ?round=1|3  &step=0..3 (0 = nothing shown, 1 = 3rd, 2 = 3rd+2nd, 3 = all)  &embed=1 (main screen, no buttons)
+import { getApi, esc, fmt, rank, modeBadge, avatar } from "./js/common.js?v=20261118b";
+import { ROUND_PRIZES } from "./js/config.js?v=20261118b";
+const api = await getApi();
+const q = new URLSearchParams(location.search);
+const embed = q.has("embed");
+if (embed) document.body.classList.add("embed");
+document.getElementById("mode").innerHTML = modeBadge(api);
+const rounds = await api.getRounds();
+const AWARD_ROUNDS = [1, 3];
+let round = AWARD_ROUNDS.includes(Number(q.get("round"))) ? Number(q.get("round")) : 1;
+let step = Math.min(Math.max(Number(q.get("step")) || 0, 0), 3);
+let lastShown = embed ? step - 1 : -1;   // on the main screen only the newest place animates
+const screen = document.getElementById("screen");
+const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" }, PLACE = { 1: "1st place", 2: "2nd place", 3: "3rd place" };
+
+function confetti() {
+  const box = document.getElementById("confetti"), colors = ["#F7931E", "#fbbf24", "#22c55e", "#60a5fa", "#f472b6", "#ffffff"];
+  box.innerHTML = Array.from({ length: 140 }, () => `<i style="left:${Math.random() * 100}vw;background:${colors[Math.floor(Math.random() * colors.length)]};animation-duration:${2.5 + Math.random() * 3}s;animation-delay:${Math.random() * 1.2}s"></i>`).join("");
+  setTimeout(() => (box.innerHTML = ""), 7000);
+}
+
+async function draw() {
+  const r = rounds.find((x) => x.id === round);
+  const top = rank(await api.getLeaderboard(round)).filter((x) => x.judges > 0).slice(0, 3);
+  const prize = ROUND_PRIZES[round] || {};
+  const shown = (p) => p >= 4 - step;           // step 1 shows place 3, step 2 places 3+2, step 3 all
+  const isNew = (p) => p === 4 - step && step !== lastShown;
+  const card = (p) => {
+    const t = top[p - 1];
+    if (!t || !shown(p)) return `<div class="pod p${p} closed"><div class="q">?</div><div class="lbl">${MEDAL[p]} ${PLACE[p]}</div></div>`;
+    return `<div class="pod p${p} open ${isNew(p) ? "new" : ""}"><div class="place">${MEDAL[p]}</div>${avatar(api, t, p === 1 ? 150 : 115, "sq pod-photo")}
+      <div class="code badge orange">${esc(t.code)}</div><div class="proj">${esc(t.project)}</div><div class="muted">${esc(t.members)}</div>
+      ${prize[p] ? `<div class="prize">${esc(prize[p])}</div>` : ""}</div>`;
+  };
+  const name = r?.name || (round === 3 ? "Final" : `Round ${round}`);
+  screen.innerHTML = `<h1 class="aw-title">🏆 ${esc(round === 3 ? "Grand Final" : name)} <span>Winners</span></h1>
+    <p class="aw-sub">${step === 0 ? "And the winners are…" : step === 3 ? "Congratulations to all winners!" : `Next: ${PLACE[4 - step - 1]}`}</p>
+    ${top.length ? `<div class="podium">${card(2)}${card(1)}${card(3)}</div>` : `<p class="empty">${esc(name)} scores are not in yet.</p>`}`;
+  if (step === 3 && lastShown !== 3) confetti();
+  lastShown = step;
+
+  document.getElementById("tabs").innerHTML = AWARD_ROUNDS.map((id) => `<button class="btn ${id === round ? "on" : ""}" data-r="${id}">${id === 3 ? "Grand Final" : esc(rounds.find((x) => x.id === id)?.name || "Round " + id)}</button>`).join("");
+  document.getElementById("ctl").innerHTML = [3, 2, 1].map((p) => `<button class="btn ${shown(p) ? "on" : ""}" data-p="${p}" ${4 - p > step + 1 ? "disabled" : ""}>${MEDAL[p]} Reveal ${PLACE[p]}</button>`).join("")
+    + `<button class="btn" data-reset>↺ Hide all</button>`;
+}
+const go = (s) => { step = Math.min(Math.max(s, 0), 3); history.replaceState(null, "", `?round=${round}&step=${step}${api.mode === "demo" ? "&demo" : ""}`); draw(); };
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.r) { round = Number(b.dataset.r); lastShown = -1; go(0); }
+  if (b.dataset.p) go(4 - Number(b.dataset.p));
+  if ("reset" in b.dataset) go(0);
+});
+document.addEventListener("keydown", (e) => {
+  if (embed) return;
+  if (["ArrowRight", " ", "PageDown"].includes(e.key)) { e.preventDefault(); go(step + 1); }
+  if (["ArrowLeft", "PageUp"].includes(e.key)) go(step - 1);
+  if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+});
+await draw();
+</script>
+</body>
+</html>

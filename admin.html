@@ -31,7 +31,7 @@
   <span id="mode"></span>
   <a class="btn" href="present.html" target="_blank">Presentation screen ↗</a>
   <a class="btn" href="live.html" target="_blank">Open live screen ↗</a>
-  <a class="btn" href="results.html" target="_blank">🏆 Results ↗</a>
+  <a class="btn" href="results.html" target="_blank">🏆 Results ↗</a> <a class="btn" href="awards.html" target="_blank">🥇 Awards ↗</a>
   <button class="btn hidden" id="logout">Log out</button>
 </header>
 <main class="wrap" id="app"></main>
@@ -248,6 +248,16 @@ function control(pane, D) {
         <button class="btn" style="margin-top:8px;width:100%" data-view="slides">📊 Show Round 2 results slides (PowerPoint) on main screen</button>
         <p class="muted small" style="margin:4px 0 0">Slides change every 10 s · <a href="slides.html?deck=round2" target="_blank">open slides ↗</a> · <a href="assets/results/round2/Round-2-Results.pptx" download>download PPT</a>.</p>
         <p class="muted small" style="margin:4px 0 0">Same list as the <a href="results.html" target="_blank">Results page ↗</a>. No scores, no ranking. To go back, press <b>Welcome</b> or <b>Next team ▶</b>.</p>
+        ${[[1, "Round 1"], [3, "Grand Final"]].map(([rid, nm]) => {
+          const cur = /^awards-(\d)-(\d)$/.exec(st.view || ""), s = cur && Number(cur[1]) === rid ? Number(cur[2]) : -1;
+          return `<div class="card" style="margin-top:10px;padding:12px 14px;border-color:rgba(251,191,36,.5)"><b>🏆 ${nm} winners — reveal on main screen</b>
+            <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px">
+              <button class="btn ${s === 0 ? "green" : ""}" data-view="awards-${rid}-0">Show podium (hidden)</button>
+              <button class="btn ${s >= 1 ? "green" : ""}" data-view="awards-${rid}-1">🥉 Reveal 3rd</button>
+              <button class="btn ${s >= 2 ? "green" : ""}" data-view="awards-${rid}-2" ${s < 1 ? "disabled" : ""}>🥈 Reveal 2nd</button>
+              <button class="btn ${s >= 3 ? "green" : ""}" data-view="awards-${rid}-3" ${s < 2 ? "disabled" : ""}>🥇 Reveal 1st</button></div></div>`;
+        }).join("")}
+        <p class="muted small" style="margin:4px 0 0">Press 3rd → 2nd → 1st. Also works on its own: <a href="awards.html" target="_blank">Awards page ↗</a>.</p>
         <label class="field" style="margin-top:10px"><span>Announcement on the screen's bottom bar (empty = show next team)</span>
           <div class="row"><input type="text" id="msg" value="${esc(st.message)}" style="flex:1"><button class="btn" id="msgbtn">Show</button></div></label>
       </div>

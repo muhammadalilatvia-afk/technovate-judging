@@ -57,6 +57,11 @@ async function render() {
     setScreen(`<iframe src="results.html?embed=1${api.mode === "demo" ? "&demo" : ""}" title="Results" style="border:0;width:100%;height:calc(100vh - 92px - 58px);display:block;background:transparent"></iframe>`);
     return;
   }
+  const aw = /^awards-(\d)-(\d)$/.exec(st.view || "");   // awards ceremony: awards-<round>-<step>
+  if (aw) {
+    setScreen(`<iframe src="awards.html?round=${aw[1]}&step=${aw[2]}&embed=1${api.mode === "demo" ? "&demo" : ""}" title="Awards" style="border:0;width:100%;height:calc(100vh - 92px - 58px);display:block;background:transparent"></iframe>`);
+    return;
+  }
   if (st.view === "slides") {   // Results slides (PowerPoint) shown on the main screen, advancing every 10 s
     setScreen(`<iframe src="slides.html?deck=round2&embed=1" title="Results slides" style="border:0;width:100%;height:calc(100vh - 92px - 58px);display:block;background:transparent"></iframe>`);
     return;
