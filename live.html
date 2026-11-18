@@ -62,6 +62,22 @@ async function render() {
     setScreen(`<iframe src="awards.html?round=${aw[1]}&step=${aw[2]}&embed=1${api.mode === "demo" ? "&demo" : ""}" title="Awards" style="border:0;width:100%;height:calc(100vh - 92px - 58px);display:block;background:transparent"></iframe>`);
     return;
   }
+  if (st.view === "appeal") {   // How to appeal a result: QR code to appeal.html
+    setScreen(`<div class="center-screen" style="gap:26px">
+      <div style="display:flex;gap:60px;align-items:center;flex-wrap:wrap;justify-content:center;padding:0 40px">
+        <div style="max-width:720px;text-align:left">
+          <div class="kicker" style="color:var(--orange);font-weight:800;letter-spacing:5px;font-size:22px">RESULTS · APPEALS</div>
+          <h1 style="font-size:clamp(44px,5vw,78px);margin:10px 0 18px;font-weight:900">⚖️ Disagree with a result?</h1>
+          <p style="font-size:clamp(22px,2vw,30px);line-height:1.45;margin:0;color:#dbe4f5">Any team can submit an official <b style="color:var(--orange)">appeal</b> — especially for the <b>Grand Final</b>.
+            Scan the QR code, log in with your <b>team code + upload code</b>, and explain why.</p>
+          <p style="font-size:clamp(20px,1.8vw,26px);margin:22px 0 0;color:#86efac;font-weight:800">✓ We reconsider every appeal and reply within 1 week.</p>
+          <p class="muted" style="font-size:20px;margin:14px 0 0">muhammadalilatvia-afk.github.io/technovate-judging/appeal.html</p>
+        </div>
+        <div style="text-align:center"><img src="assets/qr-appeal.png" alt="QR code to the appeal page" style="width:min(380px,32vw);border-radius:22px;border:6px solid var(--orange);background:#fff">
+          <div style="font-size:24px;font-weight:800;margin-top:12px">Scan to appeal</div></div>
+      </div></div>`);
+    return;
+  }
   if (st.view === "slides") {   // Results slides (PowerPoint) shown on the main screen, advancing every 10 s
     setScreen(`<iframe src="slides.html?deck=round2&embed=1" title="Results slides" style="border:0;width:100%;height:calc(100vh - 92px - 58px);display:block;background:transparent"></iframe>`);
     return;
