@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download certificates – Ajou Technovate Hackathon 3.0</title>
+<link rel="icon" href="assets/technovate-mark.svg">
+<link rel="stylesheet" href="assets/app.css?v=20261119a">
+<style>
+  .person { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: rgba(255,255,255,.04); }
+  .person h3 { margin: 0 0 10px; font-size: 20px; }
+  .dl { display: flex; gap: 10px; flex-wrap: wrap; }
+  .dl a.btn { justify-content: flex-start; }
+  .dl a.place { border-color: #fbbf24; background: rgba(251,191,36,.14); }
+  .tip { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><img src="assets/technovate-mark.svg" alt="" width="40" height="40">
+    <span><b>AJOU TECHNOVATE</b><small>HACKATHON 3.0 · CERTIFICATES</small></span></a>
+  <span class="spacer"></span>
+  <span id="mode"></span>
+  <img class="uni-logo" src="assets/ajou-logo.png" alt="Ajou University in Tashkent">
+</header>
+<main class="wrap" style="max-width:780px" id="app"></main>
+
+<script type="module">
+import { getApi, esc, modeBadge } from "./js/common.js?v=20261119a";
+const api = await getApi();
+document.getElementById("mode").innerHTML = modeBadge(api);
+const app = document.getElementById("app");
+let code = sessionStorage.getItem("teamCode") || "", key = sessionStorage.getItem("teamKey") || "";
+const MEDAL = (t) => /^1st/.test(t) ? "🥇" : /^2nd/.test(t) ? "🥈" : /^3rd/.test(t) ? "🥉" : "🏅";
+
+const intro = `<section class="card stack" style="margin-top:30px">
+  <h2 style="margin:0">🎓 Download your certificates</h2>
+  <p class="muted" style="margin:0">Every participant can download their <b>Certificate of Participation</b>. Teams that won a place
+    (Round 1 & Round 2 top 10, Grand Final top 3) also get their <b>place certificate</b>. Log in once with your team's codes —
+    you will see the certificates of every member of your team.</p>
+</section>`;
+
+function loginView(msg = "") {
+  app.innerHTML = `${intro}
+  <section class="card stack" style="margin-top:16px">
+    <h2 style="margin:0">Log in with your team</h2>
+    ${api.mode === "demo" ? `<p class="small"><span class="badge demo">DEMO</span> Team <b>T01</b>, upload code <b>100001</b></p>` : ""}
+    <form id="f" class="stack">
+      <div class="grid cols-2">
+        <label class="field"><span>Team code (e.g. T07)</span><input type="text" id="code" value="${esc(code)}" required autocomplete="off" style="text-transform:uppercase"></label>
+        <label class="field"><span>Upload code (6 digits, from the organizers)</span><input type="password" id="key" inputmode="numeric" required autocomplete="off"></label>
+      </div>
+      ${msg ? `<div class="toast err" style="position:static">${esc(msg)}</div>` : ""}
+      <button class="btn primary big" style="justify-content:center">Show my certificates</button>
+    </form>
+    <p class="muted small">Lost your codes? Ask the organizers in the <a href="https://t.me/AJOUH2025" target="_blank" rel="noopener">Telegram group</a>.</p>
+  </section>`;
+  document.getElementById("f").onsubmit = async (e) => {
+    e.preventDefault();
+    const c = document.getElementById("code").value.trim().toUpperCase(), k = document.getElementById("key").value.trim();
+    try { const list = await api.teamCertificates(c, k); code = c; key = k; sessionStorage.setItem("teamCode", c); sessionStorage.setItem("teamKey", k); listView(list); }
+    catch (err) { loginView(/function|schema cache|Could not find/i.test(err.message) ? "Certificates are not available yet. Please try again later." : err.message); }
+  };
+}
+
+function listView(list) {
+  const people = [...new Set(list.map((c) => c.person))];
+  app.innerHTML = `${intro}
+  <section class="card stack" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Team ${esc(code)}</h2><button class="btn" id="out">Log out</button></div>
+    ${people.length ? people.map((p) => `<div class="person"><h3>👤 ${esc(p)}</h3><div class="dl">
+      ${list.filter((c) => c.person === p).map((c) => {
+        const url = c.file_path ? api.certificateUrl(c.file_path, c.file_path.split("/").pop()) : "";
+        const label = c.kind === "place" ? `${MEDAL(c.title)} ${esc(c.title)}` : `🎓 ${esc(c.title)}`;
+        return url ? `<a class="btn ${c.kind === "place" ? "place" : ""}" href="${esc(url)}" target="_blank" rel="noopener">⬇ ${label}</a>`
+                   : `<span class="btn" style="opacity:.6">${label} <small>(demo – no file)</small></span>`;
+      }).join("")}</div></div>`).join("") : `<p class="muted">No certificates found for this team yet. Please contact the organizers.</p>`}
+    <p class="tip">Certificates are PDF files (A4). Open them on a phone or computer, or print them.</p>
+  </section>`;
+  document.getElementById("out").onclick = () => { sessionStorage.removeItem("teamKey"); key = ""; loginView(); };
+}
+
+if (code && key) api.teamCertificates(code, key).then(listView, () => loginView()); else loginView();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Results – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261118c">
+<link rel="stylesheet" href="assets/app.css?v=20261119a">
 <style>
   body.res { min-height: 100vh; }
   .res-wrap { padding: 22px 34px 30px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
@@ -42,11 +42,12 @@
 <main class="res-wrap" id="screen"></main>
 <p id="slidelinks" style="text-align:center;margin:0 0 30px"><a class="btn primary" href="slides.html?deck=round2">📊 Round 2 results slides</a>
   <a class="btn" href="assets/results/round2/Round-2-Results.pptx" download>⬇ Download PowerPoint</a>
+  <a class="btn" href="certificates.html">🎓 Download certificates</a>
   <a class="btn" href="appeal.html">⚖️ Appeal a result</a></p>
 
 <script type="module">
-import { getApi, esc, fmt, rank, modeBadge, clock, avatar } from "./js/common.js?v=20261118c";
-import { PUBLISHED_RESULTS, ROUND_PRIZES, SHOW_WINNERS } from "./js/config.js?v=20261118c";
+import { getApi, esc, fmt, rank, modeBadge, clock, avatar } from "./js/common.js?v=20261119a";
+import { PUBLISHED_RESULTS, ROUND_PRIZES, SHOW_WINNERS, SHOW_POSITIONS } from "./js/config.js?v=20261119a";
 const api = await getApi();
 if (new URLSearchParams(location.search).has("embed")) { document.querySelector(".live-top").style.display = "none"; document.getElementById("slidelinks").style.display = "none"; document.body.style.background = "transparent"; }
 document.getElementById("mode").innerHTML = modeBadge(api);
@@ -68,14 +69,19 @@ async function draw() {
       <div class="proj">${esc(r.project)}</div><div class="muted">${esc(r.members)}</div>
       <div class="score">${fmt(r.score)} / 100</div>${prize[p] ? `<div class="prize">${esc(prize[p])}</div>` : ""}</div>` : `<div></div>`;
   const winners = SHOW_WINNERS.includes(round.id);
+  const pos = !winners && SHOW_POSITIONS?.[round.id] ? ranked.slice(0, SHOW_POSITIONS[round.id]) : [];
+  const MED = { 1: "🥇", 2: "🥈", 3: "🥉" };
   let q = round.id < 3 ? ranked.slice(0, round.qualify_top) : [];
   if (!winners) q = [...q].sort((a, b) => String(a.code).localeCompare(String(b.code), undefined, { numeric: true }));
   screen.innerHTML = `
     ${published.length > 1 ? `<div class="tabs-r">${published.map((r) => `<button data-r="${r.id}" class="${r.id === round.id ? "on" : ""}">${esc(r.name)}</button>`).join("")}</div>` : ""}
     ${winners ? `<h1 class="res-title">🏆 ${esc(round.name)} <span>Winners</span></h1>
-    ${ranked.length ? `<div class="podium">${pod(top[1], 2)}${pod(top[0], 1)}${pod(top[2], 3)}</div>` : `<p class="empty">No results yet.</p>`}` : `<h1 class="res-title">${esc(round.name)} · <span>Top ${q.length} teams</span></h1>
-    <p class="muted" style="font-size:22px;margin:-8px 0 0;text-align:center">qualified for ${esc(nextName)} — congratulations! · winners are announced at the awards ceremony</p>`}
-    ${q.length ? `${winners ? `<h2 class="q-head">✅ Top ${q.length} <span>qualified for ${esc(nextName)}</span></h2>` : ""}
+    ${ranked.length ? `<div class="podium">${pod(top[1], 2)}${pod(top[0], 1)}${pod(top[2], 3)}</div>` : `<p class="empty">No results yet.</p>`}` : `<h1 class="res-title">${esc(round.name)} · <span>${pos.length ? "Results" : `Top ${q.length} teams`}</span></h1>
+    <p class="muted" style="font-size:22px;margin:-8px 0 0;text-align:center">${pos.length ? "final positions · congratulations to all teams!" : `qualified for ${esc(nextName)} — congratulations! · winners are announced at the awards ceremony`}</p>`}
+    ${pos.length ? `<h2 class="q-head">🏅 Top ${pos.length} <span>positions</span></h2>
+      <div class="q-grid">${pos.map((r) => `<div class="q" ${r.rank <= 3 ? `style="border-color:rgba(251,191,36,.6);background:rgba(251,191,36,.10)"` : ""}><div class="rk">${MED[r.rank] || r.rank}</div>${avatar(api, r, 46)}
+        <div class="t"><b>${r.rank}. ${esc(r.code)} · ${esc(r.project)}</b><small>${esc(r.members)}</small></div></div>`).join("")}</div>` : ""}
+    ${q.length ? `${winners || pos.length ? `<h2 class="q-head">✅ Top ${q.length} <span>qualified for ${esc(nextName)}</span></h2>` : ""}
       <div class="q-grid">${q.map((r) => `<div class="q">${winners ? `<div class="rk">${r.rank}</div>` : `<div class="rk">✅</div>`}${avatar(api, r, 46)}
         <div class="t"><b>${esc(r.code)} · ${esc(r.project)}</b><small>${esc(r.members)}</small></div>${winners ? `<div class="sc">${fmt(r.score)}</div>` : ""}</div>`).join("")}</div>` : ""}`;
   screen.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => { sel = Number(b.dataset.r); history.replaceState(null, "", `?round=${sel}${api.mode === "demo" ? "&demo" : ""}`); draw(); });

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Appeal a result – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261118c">
+<link rel="stylesheet" href="assets/app.css?v=20261119a">
 <style>
   textarea { width: 100%; min-height: 140px; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: inherit; resize: vertical; box-sizing: border-box; }
   select { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0d1d45; color: inherit; width: 100%; }
@@ -29,8 +29,8 @@
 <main class="wrap" style="max-width:780px" id="app"></main>
 
 <script type="module">
-import { getApi, esc, toast, modeBadge } from "./js/common.js?v=20261118c";
-import { APPEAL_DEADLINE, APPEAL_REVIEW_DAYS } from "./js/config.js?v=20261118c";
+import { getApi, esc, toast, modeBadge } from "./js/common.js?v=20261119a";
+import { APPEAL_DEADLINE, APPEAL_REVIEW_DAYS } from "./js/config.js?v=20261119a";
 const api = await getApi();
 document.getElementById("mode").innerHTML = modeBadge(api);
 const app = document.getElementById("app");

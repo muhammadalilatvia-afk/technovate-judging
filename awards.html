@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Awards – Ajou Technovate Hackathon 3.0</title>
 <link rel="icon" href="assets/technovate-mark.svg">
-<link rel="stylesheet" href="assets/app.css?v=20261118c">
+<link rel="stylesheet" href="assets/app.css?v=20261119a">
 <style>
   body.aw { min-height: 100vh; }
   .aw-wrap { padding: 18px 30px 26px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
@@ -53,8 +53,8 @@
 <script type="module">
 // Awards ceremony: reveal 3rd → 2nd → 1st place, for Round 1 and the Final.
 // ?round=1|3  &step=0..3 (0 = nothing shown, 1 = 3rd, 2 = 3rd+2nd, 3 = all)  &embed=1 (main screen, no buttons)
-import { getApi, esc, fmt, rank, modeBadge, avatar } from "./js/common.js?v=20261118c";
-import { ROUND_PRIZES } from "./js/config.js?v=20261118c";
+import { getApi, esc, fmt, rank, modeBadge, avatar } from "./js/common.js?v=20261119a";
+import { ROUND_PRIZES } from "./js/config.js?v=20261119a";
 const api = await getApi();
 const q = new URLSearchParams(location.search);
 const embed = q.has("embed");

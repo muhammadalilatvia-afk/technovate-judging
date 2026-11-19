@@ -163,6 +163,15 @@ export const demoBackend = {
   adminStatus: () => delay({ configured: true }),
   adminSetup: () => delay(false),
   adminCheck: (pin) => delay(pin === ADMIN_PIN),
+  // certificate downloads (demo: names only, no files)
+  teamCertificates(code, key) {
+    const db = load(), t = db.teams.find((x) => x.code.toUpperCase() === code.trim().toUpperCase() && x.upload_key === key.trim());
+    if (!t) throw new Error("Wrong team code or upload code");
+    const people = String(t.members).split(/[;,]\s*/).filter(Boolean);
+    return delay(people.flatMap((p, i) => [{ person: p, kind: "participation", title: "Certificate of Participation", file_path: null },
+      ...(t.id === 1 ? [{ person: p, kind: "place", title: "1st Place – Grand Final", file_path: null }] : [])]));
+  },
+  certificateUrl: () => "",
   // appeals (demo: stored in localStorage)
   submitAppeal(code, key, a) {
     const db = load(), t = db.teams.find((x) => x.code.toUpperCase() === code.trim().toUpperCase() && x.upload_key === key.trim());

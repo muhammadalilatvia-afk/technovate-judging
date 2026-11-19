@@ -48,3 +48,6 @@ export const ROUND_PRIZES = {
 // The database has its own copy of the deadline in supabase/008_appeals.sql (_appeal_deadline).
 export const APPEAL_DEADLINE = "2026-11-25T23:59:59+05:00";
 export const APPEAL_REVIEW_DAYS = 7;
+
+// Results page: ranked positions shown per round (positions only, no scores), e.g. Round 1 → top 10.
+export const SHOW_POSITIONS = { 1: 10 };

@@ -57,6 +57,9 @@ export function supabaseBackend(url, key) {
     adminPresentations: (pin) => rpc("admin_presentations", { p_pin: pin }),
     adminActivity: (pin, limit = 25) => rpc("admin_activity", { p_pin: pin, p_limit: limit }),
 
+    // certificate downloads (supabase/009_certificates.sql)
+    teamCertificates: (code, key) => rpc("team_certificates", { p_code: code, p_key: key }),
+    certificateUrl: (path, name) => sb.storage.from("certificates").getPublicUrl(path, { download: name || true }).data.publicUrl,
     // appeals (supabase/008_appeals.sql)
     submitAppeal: (code, key, a) => rpc("submit_appeal", { p_code: code, p_key: key, p_round: a.round, p_name: a.name, p_contact: a.contact, p_reason: a.reason, p_request: a.request || "" }),
     teamAppeals: (code, key) => rpc("team_appeals", { p_code: code, p_key: key }),
